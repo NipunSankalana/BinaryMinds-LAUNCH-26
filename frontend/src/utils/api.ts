@@ -69,6 +69,14 @@ export interface HopEntry {
   total_hop_latency_ms: number;
 }
 
+export interface HopLatency {
+  from_node: string;
+  to_node: string;
+  void_distance_km: number;
+  breakdown: LatencyBreakdown;
+  total_hop_latency_ms: number;
+}
+
 export interface Packet {
   origin_id: string;
   destination_id: string;
@@ -127,7 +135,7 @@ export const api = {
     }),
 
   calculateLatency: (req: RouteRequest) => 
-    request<{ route: string[]; hops: HopEntry[]; total_latency_ms: number }>('/api/latency/calculate', {
+    request<{ route: string[]; hops: HopLatency[]; total_latency_ms: number }>('/api/latency/calculate', {
       method: 'POST',
       body: JSON.stringify(req),
     }),
