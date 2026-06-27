@@ -10,6 +10,8 @@ interface StarMapProps {
   onSelectDest: (id: string | null) => void;
   killedNodes: Set<string>;
   onToggleNodeKilled: (id: string) => void;
+  killedLinks: Set<string>;
+  onToggleLinkKilled: (from: string, to: string) => void;
   activeRoute: RouteResult | null;
   packetProgress: { currentHopIndex: number; progress: number } | null;
   onSelectPlanet?: (id: string) => void;
@@ -23,6 +25,8 @@ export const StarMap: React.FC<StarMapProps> = ({
   onSelectDest,
   killedNodes,
   onToggleNodeKilled,
+  killedLinks,
+  onToggleLinkKilled,
   activeRoute,
   packetProgress,
   onSelectPlanet,
@@ -95,8 +99,12 @@ export const StarMap: React.FC<StarMapProps> = ({
     horizontalGridVals.push(minY + (i * (maxY - minY)) / gridDivs);
   }
 
+  // Helper: is a link between two planet IDs currently killed?
+  const isLinkKilledFn = (a: string, b: string) =>
+    killedLinks.has(`${a}-${b}`) || killedLinks.has(`${b}-${a}`);
+
   // Draw links between planets that are within void hop distance
-  const links: { from: string; to: string; x1: number; y1: number; x2: number; y2: number; distKm: number; active: boolean; isKilled: boolean }[] = [];
+  const links: { from: string; to: string; x1: number; y1: number; x2: number; y2: number; distKm: number; active: boolean; isKilled: boolean; isLinkKilled: boolean }[] = [];
   for (let i = 0; i < config.nodes.length; i++) {
     const nA = config.nodes[i];
     const posA = toScreen(nA.x, nA.y);
@@ -112,6 +120,7 @@ export const StarMap: React.FC<StarMapProps> = ({
       if (voidDist <= maxVoidHop) {
         const active = !!(activeRoute?.path.includes(nA.id) && activeRoute?.path.includes(nB.id) && Math.abs(activeRoute.path.indexOf(nA.id) - activeRoute.path.indexOf(nB.id)) === 1);
         const isKilled = killedNodes.has(nA.id) || killedNodes.has(nB.id);
+        const isLinkKilledVal = isLinkKilledFn(nA.id, nB.id);
 
         links.push({
           from: nA.id,
@@ -123,6 +132,7 @@ export const StarMap: React.FC<StarMapProps> = ({
           distKm: voidDist,
           active,
           isKilled,
+          isLinkKilled: isLinkKilledVal,
         });
       }
     }
@@ -291,31 +301,57 @@ export const StarMap: React.FC<StarMapProps> = ({
             );
           })}
 
-          {/* Connectors (Links) */}
+          {/* Connectors (Links) — clickable to toggle kill state */}
           {links.map((link, idx) => {
             const isRouteEdge = activeRoute?.path.includes(link.from) && activeRoute?.path.includes(link.to) && Math.abs(activeRoute.path.indexOf(link.from) - activeRoute.path.indexOf(link.to)) === 1;
+            const midX = (link.x1 + link.x2) / 2;
+            const midY = (link.y1 + link.y2) / 2;
 
             return (
-              <g key={idx}>
-                {isRouteEdge ? (
-                  // Glowing Laser Beam
+              <g
+                key={idx}
+                className="cursor-pointer"
+                onClick={() => onToggleLinkKilled(link.from, link.to)}
+              >
+                {/* Wide transparent hit area for easy clicking */}
+                <line
+                  x1={link.x1} y1={link.y1}
+                  x2={link.x2} y2={link.y2}
+                  stroke="transparent"
+                  strokeWidth="16"
+                />
+
+                {link.isLinkKilled ? (
+                  // ── SEVERED LINK — red broken line
+                  <>
+                    <line
+                      x1={link.x1} y1={link.y1}
+                      x2={link.x2} y2={link.y2}
+                      stroke="#ff3366"
+                      strokeWidth="2"
+                      strokeDasharray="6 5"
+                      opacity="0.85"
+                      filter="url(#glow-red)"
+                    />
+                    {/* ✕ badge at midpoint */}
+                    <circle cx={midX} cy={midY} r="8" fill="#1a0008" stroke="#ff3366" strokeWidth="1.5" />
+                    <text x={midX} y={midY + 4} textAnchor="middle" fill="#ff3366" fontSize="9" fontWeight="bold">✕</text>
+                  </>
+                ) : isRouteEdge ? (
+                  // ── ACTIVE ROUTE — glowing cyan laser
                   <line
-                    x1={link.x1}
-                    y1={link.y1}
-                    x2={link.x2}
-                    y2={link.y2}
+                    x1={link.x1} y1={link.y1}
+                    x2={link.x2} y2={link.y2}
                     stroke={link.isKilled ? '#ff3366' : '#00f2fe'}
                     strokeWidth="3"
                     className="laser-beam"
                     filter={link.isKilled ? 'url(#glow-red)' : 'url(#glow-cyan)'}
                   />
                 ) : (
-                  // Standard Link
+                  // ── NORMAL LINK
                   <line
-                    x1={link.x1}
-                    y1={link.y1}
-                    x2={link.x2}
-                    y2={link.y2}
+                    x1={link.x1} y1={link.y1}
+                    x2={link.x2} y2={link.y2}
                     stroke={link.isKilled ? 'rgba(255,51,102,0.06)' : 'rgba(255,255,255,0.035)'}
                     strokeWidth="1.2"
                     strokeDasharray="4 6"

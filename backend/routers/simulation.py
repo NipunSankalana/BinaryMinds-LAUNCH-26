@@ -122,6 +122,50 @@ def kill_link(req: KillEdgeRequest) -> SimulationStateResponse:
     )
 
 
+@router.post("/toggle/link", response_model=SimulationStateResponse, summary="Toggle a Link (kill or restore)")
+def toggle_link(req: KillEdgeRequest) -> SimulationStateResponse:
+    """
+    Toggle the operational state of a link between two planets.
+    - If the link is currently DEAD → it is restored (removed from killed set).
+    - If the link is currently ALIVE → it is killed (added to killed set).
+    Both (A, B) and (B, A) orderings are treated as the same edge.
+    """
+    edge_ab: Tuple[str, str] = (req.source_id, req.target_id)
+    edge_ba: Tuple[str, str] = (req.target_id, req.source_id)
+
+    if edge_ab in _killed_edges:
+        _killed_edges.discard(edge_ab)
+    elif edge_ba in _killed_edges:
+        _killed_edges.discard(edge_ba)
+    else:
+        # Normalize to alphabetical order for consistent key
+        _killed_edges.add(edge_ab)
+
+    return SimulationStateResponse(
+        killed_nodes=list(_killed_nodes),
+        killed_edges=list(_killed_edges),
+        last_packet=_last_packet,
+    )
+
+
+@router.post("/restore/link", response_model=SimulationStateResponse, summary="Restore a Link")
+def restore_link(req: KillEdgeRequest) -> SimulationStateResponse:
+    """
+    Restore a previously killed link between two planets.
+    Handles both edge orderings (A→B and B→A).
+    """
+    edge_ab: Tuple[str, str] = (req.source_id, req.target_id)
+    edge_ba: Tuple[str, str] = (req.target_id, req.source_id)
+    _killed_edges.discard(edge_ab)
+    _killed_edges.discard(edge_ba)
+
+    return SimulationStateResponse(
+        killed_nodes=list(_killed_nodes),
+        killed_edges=list(_killed_edges),
+        last_packet=_last_packet,
+    )
+
+
 @router.post("/reset", response_model=SimulationStateResponse, summary="Reset Simulation")
 def reset_simulation() -> SimulationStateResponse:
     """

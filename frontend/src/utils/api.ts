@@ -158,6 +158,18 @@ export const api = {
       body: JSON.stringify({ source_id: sourceId, target_id: targetId }),
     }),
 
+  toggleLink: (sourceId: string, targetId: string) =>
+    request<SimulationStateResponse>('/api/simulation/toggle/link', {
+      method: 'POST',
+      body: JSON.stringify({ source_id: sourceId, target_id: targetId }),
+    }),
+
+  restoreLink: (sourceId: string, targetId: string) =>
+    request<SimulationStateResponse>('/api/simulation/restore/link', {
+      method: 'POST',
+      body: JSON.stringify({ source_id: sourceId, target_id: targetId }),
+    }),
+
   resetSimulation: () => 
     request<SimulationStateResponse>('/api/simulation/reset', {
       method: 'POST',

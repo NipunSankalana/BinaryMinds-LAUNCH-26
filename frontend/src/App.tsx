@@ -197,6 +197,32 @@ function App() {
     }
   };
 
+  const handleToggleLinkKilled = (from: string, to: string) => {
+    const key1 = `${from}-${to}`;
+    const key2 = `${to}-${from}`;
+    const isCurrentlyKilled = killedLinks.has(key1) || killedLinks.has(key2);
+
+    api.toggleLink(from, to).then(() => {
+      setKilledLinks(prev => {
+        const next = new Set(prev);
+        if (isCurrentlyKilled) {
+          next.delete(key1);
+          next.delete(key2);
+        } else {
+          next.add(key1);
+        }
+        return next;
+      });
+      if (isCurrentlyKilled) {
+        addLog(`[CHAOS ENG] Link ${from} ↔ ${to} restored. Signal path online.`, 'info');
+      } else {
+        addLog(`[CHAOS ENG] ALERT: Link ${from} ↔ ${to} SEVERED. Rerouting...`, 'error');
+      }
+    }).catch(err => {
+      addLog(`[CHAOS ENG] Error toggling link: ${err.message}`, 'error');
+    });
+  };
+
   const handleLoadDefaultUniverse = () => {
     api.resetSimulation().then(() => {
       setKilledNodes(new Set());
@@ -401,6 +427,8 @@ function App() {
             onSelectDest={setSelectedDest}
             killedNodes={killedNodes}
             onToggleNodeKilled={handleToggleNodeKilled}
+            killedLinks={killedLinks}
+            onToggleLinkKilled={handleToggleLinkKilled}
             activeRoute={activeRoute}
             packetProgress={packetProgress}
             onSelectPlanet={setInspectedPlanetId}
