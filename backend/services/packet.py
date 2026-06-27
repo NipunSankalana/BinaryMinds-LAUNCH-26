@@ -101,27 +101,55 @@ def simulate_delivery(
             dest_codex=dst_node.codex,
         )
 
+        # --- Source planet: ingress tower → egress tower ---
         entry_tower_src = entry_tower_map[src_id]
-        exit_tower_src = exit_tower_map[src_id]
+        exit_tower_src  = exit_tower_map[src_id]
+        transit_src = calculate_crust_transit_time(
+            src_node, entry_tower_src, exit_tower_src, ff, c, td
+        )
+
+        # --- Destination planet ---
         entry_tower_dst = entry_tower_map[dst_id]
 
-        transit_src = calculate_crust_transit_time(src_node, entry_tower_src, exit_tower_src, ff, c, td)
-
         is_last_hop = (i == len(route) - 2)
-        if is_last_hop:
-            exit_tower_dst = exit_tower_map[dst_id]  # should be 0
-            transit_dst = calculate_crust_transit_time(dst_node, entry_tower_dst, exit_tower_dst, ff, c, td)
-        else:
-            transit_dst = {"fiber_time_ms": 0.0, "tower_delay_ms": 0.0, "total_transit_ms": 0.0}
 
+        if is_last_hop:
+            # At the final destination, packet travels to tower 0 (the "ground station")
+            exit_tower_dst = exit_tower_map[dst_id]  # set to 0 by find_route_tower
+            transit_dst = calculate_crust_transit_time(
+                dst_node, entry_tower_dst, exit_tower_dst, ff, c, td
+            )
+        else:
+            # ── INTERMEDIATE RELAY PLANET ───────────────────────────────────
+            # The packet arrives at dst via entry_tower_dst (closest to src's egress).
+            # It must cross the ring to the egress tower facing the NEXT hop planet.
+            next_id   = route[i + 2]
+            next_node = _node_by_id(config, next_id)
+
+            # Egress tower on dst facing next_hop planet
+            exit_tower_dst, _, _ = find_closest_tower_pair(dst_node, next_node, scale)
+
+            # Crust transit: ingress → egress across the equatorial fiber ring
+            transit_dst = calculate_crust_transit_time(
+                dst_node, entry_tower_dst, exit_tower_dst, ff, c, td
+            )
+
+            # Update the entry_tower_map so the next iteration uses the correct
+            # ingress tower for the relay planet when it becomes 'src'
+            entry_tower_map[dst_id] = exit_tower_dst
+            exit_tower_map[dst_id]  = exit_tower_dst
+
+        # ------------------------------------------------------------------ #
+        # Void gap physics
+        # ------------------------------------------------------------------ #
         void_dist = calc_void_distance(src_node, dst_node, scale)
 
-        fiber_exit_ms = transit_src["fiber_time_ms"]
+        fiber_exit_ms      = transit_src["fiber_time_ms"]
         atmosphere_exit_ms = (src_node.atmosphere_thickness_km * src_node.refraction_index / c) * 1000.0
-        void_ms = (void_dist / c) * 1000.0
+        void_ms            = (void_dist / c) * 1000.0
         atmosphere_entry_ms = (dst_node.atmosphere_thickness_km * dst_node.refraction_index / c) * 1000.0
-        tower_ms = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
-        fiber_entry_ms = transit_dst["fiber_time_ms"]
+        tower_ms           = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
+        fiber_entry_ms     = transit_dst["fiber_time_ms"]
 
         hop_latency_ms = (
             fiber_exit_ms

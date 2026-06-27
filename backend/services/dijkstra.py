@@ -92,6 +92,7 @@ def find_route_tower(
 
             exit_tower_u, entry_tower_v, _ = find_closest_tower_pair(node_u, node_v, scale)
 
+            # Full source-planet crust crossing: known ingress → egress toward node_v
             transit_u = calculate_crust_transit_time(
                 node_u,
                 entry_tower_u,
@@ -103,7 +104,18 @@ def find_route_tower(
 
             void_time = calc_void_travel_time(node_u, node_v, void_dist, speed_of_light)
 
-            alt = dist[u] + transit_u["total_transit_ms"] + void_time
+            # Estimate entry transit on node_v: ingress tower → tower 0 (conservative relay cost).
+            # Packet.py will recalculate this precisely using the actual next-hop planet.
+            transit_v_arrival = calculate_crust_transit_time(
+                node_v,
+                entry_tower_v,
+                0,
+                fiber_speed_fraction,
+                speed_of_light,
+                tower_delay
+            )
+
+            alt = dist[u] + transit_u["total_transit_ms"] + void_time + transit_v_arrival["total_transit_ms"]
 
             if alt < dist[node_v.id]:
                 dist[node_v.id] = alt
