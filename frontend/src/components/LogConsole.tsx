@@ -29,12 +29,12 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
   selectedDest,
 }) => {
   const [showRawSchema, setShowRawSchema] = useState<boolean>(false);
-  const consoleEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to the bottom of the log console when new logs arrive
+  // Scroll only inside the log box, not the page
   useEffect(() => {
-    if (consoleEndRef.current) {
-      consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   }, [logs]);
 
@@ -99,8 +99,11 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
         </div>
       </div>
 
-      {/* Terminal log output */}
-      <div className="terminal-layout flex-grow overflow-y-auto pr-1 flex flex-col gap-2 h-[410px]">
+      {/* Terminal log output — scroll container is scoped to this div only */}
+      <div
+        ref={scrollContainerRef}
+        className="terminal-layout flex-grow overflow-y-auto pr-1 flex flex-col gap-2 h-[410px]"
+      >
         {/* Render real-time console log messages */}
         <div className="flex flex-col gap-2 font-mono text-[0.78rem] select-text">
           {logs.map((log, idx) => {
@@ -116,7 +119,6 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
               </div>
             );
           })}
-          <div ref={consoleEndRef} />
         </div>
       </div>
 
