@@ -463,6 +463,7 @@ function App() {
           isSimulating={isSimulating}
           selectedOrigin={selectedOrigin}
           selectedDest={selectedDest}
+          payloadText={payloadText}
         />
       </main>
     </div>

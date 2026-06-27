@@ -21,6 +21,7 @@ interface LogConsoleProps {
   isSimulating: boolean;
   selectedOrigin: string | null;
   selectedDest: string | null;
+  payloadText: string;
 }
 
 // ─── Parse a log line into structured visual parts ──────────────────────────
@@ -258,6 +259,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
   isSimulating,
   selectedOrigin,
   selectedDest,
+  payloadText,
 }) => {
   const [showRawSchema, setShowRawSchema] = useState<boolean>(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -290,17 +292,61 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
     }
   }
 
-  // Raw packet schema
+  // ── Raw Packet Schema (Section 7 compliant)
   const rawPacketSchema = useMemo(() => {
     if (!selectedOrigin || !selectedDest) return null;
+
+    // Build structured hop_log: one entry per planet in the path
+    // ingress_tower = null at origin, egress_tower = null at destination
+    const hopLog: object[] = [];
+
+    if (activeRoute && activeRoute.path.length > 0 && activeRoute.hop_logs.length > 0) {
+      const path = activeRoute.path;
+      const hops = activeRoute.hop_logs;
+
+      path.forEach((planetId, idx) => {
+        const planet = config?.nodes.find(n => n.id === planetId);
+        const codexUsed = planet?.codex ?? 0;
+
+        // ingress_tower: null for origin, otherwise entry tower of the incoming hop
+        const ingressTower = idx === 0
+          ? null
+          : (hops[idx - 1]?.entry_tower ?? null);
+
+        // egress_tower: null for final destination, otherwise exit tower of the outgoing hop
+        const egressTower = idx === path.length - 1
+          ? null
+          : (hops[idx]?.exit_tower ?? null);
+
+        // binary_stream: present on every hop except the final destination
+        const binStream = idx < hops.length
+          ? (hops[idx]?.binary_stream ?? null)
+          : null;
+
+        hopLog.push({
+          planet_id: planetId,
+          ingress_tower: ingressTower,
+          egress_tower: egressTower,
+          codex_used: codexUsed,
+          binary_stream: binStream,
+        });
+      });
+    }
+
+    const currentIdx = packetProgress?.currentHopIndex ?? 0;
+    const currentPlanet = activeRoute?.path[currentIdx] ?? selectedOrigin;
+
     return {
+      schema_version: "relic-ring-v1",
       origin_id: selectedOrigin,
       destination_id: selectedDest,
-      current_id: packetProgress && activeRoute ? activeRoute.path[packetProgress.currentHopIndex] : selectedOrigin,
-      payload: "Hello world (ASCII)",
-      hop_log: activeRoute ? activeRoute.hop_logs.map(h => `Tower ${h.exit_tower} @ ${h.from_planet} -> Tower ${h.entry_tower} @ ${h.to_planet}`) : []
+      current_id: currentPlanet,
+      payload: payloadText || "Hello world",
+      total_latency_ms: activeRoute?.total_latency_ms ?? null,
+      hop_count: activeRoute?.path.length ? activeRoute.path.length - 1 : 0,
+      hop_log: hopLog,
     };
-  }, [selectedOrigin, selectedDest, packetProgress, activeRoute]);
+  }, [selectedOrigin, selectedDest, packetProgress, activeRoute, config, payloadText]);
 
   return (
     <div className="glass-panel p-5 border border-solid flex flex-col h-full flex-grow relative">
@@ -392,15 +438,33 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
         <div className="mt-3 select-none">
           <button
             onClick={() => setShowRawSchema(!showRawSchema)}
-            className="text-[0.62rem] font-display font-semibold w-full border border-solid border-slate-800 hover:border-slate-600 rounded py-2 text-slate-400 hover:text-slate-300 transition-colors uppercase flex items-center justify-center gap-1"
+            className="text-[0.62rem] font-display font-semibold w-full border border-solid rounded py-2 transition-colors uppercase flex items-center justify-center gap-1"
+            style={{
+              borderColor: showRawSchema ? 'rgba(0,242,254,0.5)' : 'rgba(255,255,255,0.1)',
+              color: showRawSchema ? '#00f2fe' : '#64748b',
+              background: showRawSchema ? 'rgba(0,242,254,0.05)' : 'transparent',
+            }}
           >
             {showRawSchema ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
             VIEW RAW PACKET SCHEMA
           </button>
 
           {showRawSchema && (
-            <pre className="bg-black/80 border border-solid border-slate-800 p-3.5 rounded mt-2 text-[0.58rem] text-slate-300 font-mono overflow-auto max-h-[140px] text-left select-text">
-              {JSON.stringify(rawPacketSchema, null, 2)}
+            <pre
+              className="rounded mt-2 text-[0.58rem] font-mono overflow-auto text-left select-text"
+              style={{
+                background: 'rgba(0,0,0,0.85)',
+                border: '1px solid rgba(0,242,254,0.2)',
+                padding: '12px 14px',
+                maxHeight: '220px',
+                color: '#94a3b8',
+                lineHeight: '1.6',
+              }}
+            >
+              {JSON.stringify(rawPacketSchema, null, 2)
+                // Syntax-highlight keys in cyan
+                .replace(/"([^"]+)":/g, (_, key) =>
+                  `[0m"\u001b[36m${key}\u001b[0m":`)}
             </pre>
           )}
         </div>
@@ -409,7 +473,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
   );
 };
 
-// Helper stubs (kept for compatibility, not used internally)
+// Helper stubs (kept for compatibility)
 function getCodexForPlanet(planetId: string, config: UniverseConfig | null): number {
   if (!config) return 0;
   const p = config.nodes.find(n => n.id === planetId);
