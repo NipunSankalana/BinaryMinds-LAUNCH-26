@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { StarMap } from './components/StarMap';
 import { ControlPanel } from './components/ControlPanel';
 import { LogConsole } from './components/LogConsole';
 import { LatencyMetrics } from './components/LatencyMetrics';
+import { PlanetTowersMap } from './components/PlanetTowersMap';
 import {
   findClosestTowerPair,
   encodeToBaseX
@@ -31,6 +32,40 @@ function App() {
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [packetProgress, setPacketProgress] = useState<{ currentHopIndex: number; progress: number } | null>(null);
   const [logs, setLogs] = useState<LogMessage[]>([]);
+
+  // Derive active hop details for the PlanetTowersMap visualizer
+  const activeHop = useMemo(() => {
+    if (!packetProgress || !activeRoute || !config) return null;
+    const { currentHopIndex, progress } = packetProgress;
+    const path = activeRoute.path;
+    const hopLogs = activeRoute.hop_logs;
+
+    if (currentHopIndex >= path.length - 1 || currentHopIndex >= hopLogs.length) return null;
+
+    const currentHop = hopLogs[currentHopIndex];
+    const fromPlanetId = currentHop.from_planet;
+    const toPlanetId = currentHop.to_planet;
+
+    if (progress < 0.5) {
+      // Source planet egress
+      const receivingTower = currentHopIndex > 0 ? hopLogs[currentHopIndex - 1].entry_tower : currentHop.exit_tower;
+      return {
+        planetId: fromPlanetId,
+        receivingTower: receivingTower,
+        sendingTower: currentHop.exit_tower,
+      };
+    } else {
+      // Destination planet ingress
+      const sendingTower = currentHopIndex < path.length - 2 && currentHopIndex + 1 < hopLogs.length
+        ? hopLogs[currentHopIndex + 1].exit_tower
+        : currentHop.entry_tower;
+      return {
+        planetId: toPlanetId,
+        receivingTower: currentHop.entry_tower,
+        sendingTower: sendingTower,
+      };
+    }
+  }, [packetProgress, activeRoute, config]);
 
   // Auto-calculate route on configuration, endpoints or chaos changes
   useEffect(() => {
@@ -305,35 +340,42 @@ function App() {
       {/* Main Grid Layout */}
       <main className="main-layout flex-grow">
         {/* Left Sidebar: Controls & Chaos */}
-        <ControlPanel
-          config={config}
-          onConfigChange={setConfig}
-          selectedOrigin={selectedOrigin}
-          selectedDest={selectedDest}
-          onSelectOrigin={setSelectedOrigin}
-          onSelectDest={setSelectedDest}
-          payloadText={payloadText}
-          setPayloadText={setPayloadText}
-          onRunSimulation={handleRunSimulation}
-          onResetSimulation={() => {
-            setSelectedOrigin('Aegis');
-            setSelectedDest('Caelum');
-            setStartTower(0);
-            setEndTower(0);
-            setPayloadText('Hello world');
-            setPacketProgress(null);
-            setIsSimulating(false);
-            setLogs([
-              { text: "=== CONSOLE RESET ===", type: "info" },
-              { text: "Ready.", type: "plain" }
-            ]);
-          }}
-          isSimulating={isSimulating}
-          onLoadDefaultUniverse={handleLoadDefaultUniverse}
-          killedNodes={killedNodes}
-          onToggleNodeKilled={handleToggleNodeKilled}
-          onRepairAll={handleRepairAll}
-        />
+        <div className="flex flex-col gap-4">
+          <ControlPanel
+            config={config}
+            onConfigChange={setConfig}
+            selectedOrigin={selectedOrigin}
+            selectedDest={selectedDest}
+            onSelectOrigin={setSelectedOrigin}
+            onSelectDest={setSelectedDest}
+            payloadText={payloadText}
+            setPayloadText={setPayloadText}
+            onRunSimulation={handleRunSimulation}
+            onResetSimulation={() => {
+              setSelectedOrigin('Aegis');
+              setSelectedDest('Caelum');
+              setStartTower(0);
+              setEndTower(0);
+              setPayloadText('Hello world');
+              setPacketProgress(null);
+              setIsSimulating(false);
+              setLogs([
+                { text: "=== CONSOLE RESET ===", type: "info" },
+                { text: "Ready.", type: "plain" }
+              ]);
+            }}
+            isSimulating={isSimulating}
+            onLoadDefaultUniverse={handleLoadDefaultUniverse}
+            killedNodes={killedNodes}
+            onToggleNodeKilled={handleToggleNodeKilled}
+            onRepairAll={handleRepairAll}
+          />
+          <PlanetTowersMap
+            config={config}
+            activeHop={activeHop}
+            isSimulating={isSimulating}
+          />
+        </div>
 
         {/* Center Canvas & Metrics */}
         <div className="flex flex-col h-full overflow-hidden">
