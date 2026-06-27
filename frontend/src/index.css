@@ -79,8 +79,8 @@ header.app-header {
 /* Layout Structure matching screenshot */
 .main-layout {
   display: grid;
-  grid-template-columns: 340px 1fr 400px;
-  gap: 20px;
+  grid-template-columns: 310px 1fr 480px;
+  gap: 16px;
   padding: 16px 16px 48px 16px;
   flex-grow: 1;
   min-height: calc(100vh - 54px);

@@ -313,7 +313,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
       {/* ── Log output */}
       <div
         ref={scrollContainerRef}
-        className="terminal-layout flex-grow overflow-y-auto pr-1 h-[410px]"
+        className="terminal-layout flex-grow overflow-y-auto pr-1 h-[490px]"
         style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}
       >
         {logs.length === 0 && (
