@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Planet, UniverseConfig, RouteResult, getTowerCoordinates } from '../utils/math';
-import { Power, Circle, Radio, Activity, Eye, ShieldAlert } from 'lucide-react';
+import type { Planet, UniverseConfig, RouteResult } from '../utils/math';
+import { Power, Activity } from 'lucide-react';
 
 interface StarMapProps {
   config: UniverseConfig | null;
@@ -83,15 +83,14 @@ export const StarMap: React.FC<StarMapProps> = ({
     );
   }
 
-  // Draw grid lines
-  const gridLines = [];
+  // Draw grid lines (separate arrays for safe type checking)
+  const verticalGridVals: number[] = [];
+  const horizontalGridVals: number[] = [];
   const gridDivs = 10;
   const { minX, maxX, minY, maxY } = bounds;
   for (let i = 1; i < gridDivs; i++) {
-    const xVal = minX + (i * (maxX - minX)) / gridDivs;
-    const yVal = minY + (i * (maxY - minY)) / gridDivs;
-    gridLines.push({ x: toScreen(xVal, minY), type: 'v', value: xVal });
-    gridLines.push({ y: toScreen(minX, yVal), type: 'h', value: yVal });
+    verticalGridVals.push(minX + (i * (maxX - minX)) / gridDivs);
+    horizontalGridVals.push(minY + (i * (maxY - minY)) / gridDivs);
   }
 
   // Draw links between planets that are within void hop distance
@@ -111,8 +110,6 @@ export const StarMap: React.FC<StarMapProps> = ({
 
       if (voidDist <= maxVoidHop) {
         // Link exists
-        const linkKey1 = `${nA.id}-${nB.id}`;
-        const linkKey2 = `${nB.id}-${nA.id}`;
         const active = !!(activeRoute?.path.includes(nA.id) && activeRoute?.path.includes(nB.id) && Math.abs(activeRoute.path.indexOf(nA.id) - activeRoute.path.indexOf(nB.id)) === 1);
         const isKilled = killedNodes.has(nA.id) || killedNodes.has(nB.id);
 
@@ -226,29 +223,34 @@ export const StarMap: React.FC<StarMapProps> = ({
           </defs>
 
           {/* Grid Background */}
-          {gridLines.map((line, idx) => (
-            <React.Fragment key={idx}>
-              {line.type === 'v' ? (
-                <line
-                  x1={line.x.x}
-                  y1={0}
-                  x2={line.x.x}
-                  y2={svgHeight}
-                  stroke="rgba(255,255,255,0.02)"
-                  strokeWidth="1"
-                />
-              ) : (
-                <line
-                  x1={0}
-                  y1={line.y.y}
-                  x2={svgWidth}
-                  y2={line.y.y}
-                  stroke="rgba(255,255,255,0.02)"
-                  strokeWidth="1"
-                />
-              )}
-            </React.Fragment>
-          ))}
+          {verticalGridVals.map((xVal, idx) => {
+            const screenPos = toScreen(xVal, minY);
+            return (
+              <line
+                key={`v-${idx}`}
+                x1={screenPos.x}
+                y1={0}
+                x2={screenPos.x}
+                y2={svgHeight}
+                stroke="rgba(255,255,255,0.02)"
+                strokeWidth="1"
+              />
+            );
+          })}
+          {horizontalGridVals.map((yVal, idx) => {
+            const screenPos = toScreen(minX, yVal);
+            return (
+              <line
+                key={`h-${idx}`}
+                x1={0}
+                y1={screenPos.y}
+                x2={svgWidth}
+                y2={screenPos.y}
+                stroke="rgba(255,255,255,0.02)"
+                strokeWidth="1"
+              />
+            );
+          })}
 
           {/* Links */}
           {links.map((link, idx) => {
@@ -294,7 +296,6 @@ export const StarMap: React.FC<StarMapProps> = ({
             const atmosPx = rPx + 6 + planet.atmosphere_thickness_km / 40;
 
             let strokeColor = 'rgba(255,255,255,0.15)';
-            let fillGrad = 'url(#grad-planet-norm)';
             let glowFilter = '';
 
             if (isOrigin) {
