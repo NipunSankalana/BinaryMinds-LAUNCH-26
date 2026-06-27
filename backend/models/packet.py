@@ -16,6 +16,8 @@ class LatencyBreakdown(BaseModel):
     atmosphere_entry_ms: float # atmosphere entry on destination side
     tower_ms: float            # tower processing delay at destination
     fiber_entry_ms: float      # crust transit entering destination planet
+    src_tower_delay_ms: Optional[float] = 0.0
+    dst_tower_delay_ms: Optional[float] = 0.0
 
 
 class HopEntry(BaseModel):

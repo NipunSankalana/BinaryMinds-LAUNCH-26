@@ -50,7 +50,7 @@ def find_route_tower(
     entry_tower = {}
     exit_tower = {}
 
-    active_nodes = [n for n in nodes if n.id not in killed_nodes]
+    active_nodes = [n for n in active_nodes_list if n.id not in killed_nodes] if 'active_nodes_list' in locals() else [n for n in nodes if n.id not in killed_nodes]
     for n in active_nodes:
         dist[n.id] = float('inf')
 
@@ -92,7 +92,7 @@ def find_route_tower(
 
             exit_tower_u, entry_tower_v, _ = find_closest_tower_pair(node_u, node_v, scale)
 
-            # Full source-planet crust crossing: known ingress → egress toward node_v
+            # Crust transit on u from entry to exit facing v
             transit_u = calculate_crust_transit_time(
                 node_u,
                 entry_tower_u,
@@ -104,18 +104,9 @@ def find_route_tower(
 
             void_time = calc_void_travel_time(node_u, node_v, void_dist, speed_of_light)
 
-            # Estimate entry transit on node_v: ingress tower → tower 0 (conservative relay cost).
-            # Packet.py will recalculate this precisely using the actual next-hop planet.
-            transit_v_arrival = calculate_crust_transit_time(
-                node_v,
-                entry_tower_v,
-                0,
-                fiber_speed_fraction,
-                speed_of_light,
-                tower_delay
-            )
-
-            alt = dist[u] + transit_u["total_transit_ms"] + void_time + transit_v_arrival["total_transit_ms"]
+            # The cost to reach v's ingress tower is the cost to reach u's ingress, plus
+            # transit across u, plus void travel to v.
+            alt = dist[u] + transit_u["total_transit_ms"] + void_time
 
             if alt < dist[node_v.id]:
                 dist[node_v.id] = alt
@@ -132,7 +123,7 @@ def find_route_tower(
         path.insert(0, curr)
         curr = parent.get(curr)
 
-    # Re-populate exit_tower for the chosen path to avoid overwrite bugs
+    # Re-populate exit_tower for the chosen path to ensure they are correct
     for i in range(len(path) - 1):
         u = path[i]
         v = path[i + 1]

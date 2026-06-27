@@ -84,16 +84,22 @@ def calculate_latency(req: LatencyRequest) -> LatencyResponse:
 
         entry_tower_src = entry_tower_map[src_id]
         exit_tower_src = exit_tower_map[src_id]
-        entry_tower_dst = entry_tower_map[dst_id]
-
         transit_src = calculate_crust_transit_time(src_node, entry_tower_src, exit_tower_src, ff, c, td)
 
         is_last_hop = (i == len(route) - 2)
         if is_last_hop:
-            exit_tower_dst = exit_tower_map[dst_id]
+            entry_tower_dst = entry_tower_map[dst_id]
+            exit_tower_dst = exit_tower_map[dst_id] # this is end_tower (usually 0)
             transit_dst = calculate_crust_transit_time(dst_node, entry_tower_dst, exit_tower_dst, ff, c, td)
         else:
-            transit_dst = {"fiber_time_ms": 0.0, "tower_delay_ms": 0.0, "total_transit_ms": 0.0}
+            # Relay destination is charged 0 in this hop; it's computed as src in next hop.
+            transit_dst = {
+                "fiber_time_ms": 0.0,
+                "tower_delay_ms": 0.0,
+                "total_transit_ms": 0.0,
+                "segments": 0,
+                "towers_hit": 0,
+            }
 
         void_dist = calc_void_distance(src_node, dst_node, scale)
 
@@ -101,8 +107,9 @@ def calculate_latency(req: LatencyRequest) -> LatencyResponse:
         atmosphere_exit_ms = (src_node.atmosphere_thickness_km * src_node.refraction_index / c) * 1000.0
         void_ms = (void_dist / c) * 1000.0
         atmosphere_entry_ms = (dst_node.atmosphere_thickness_km * dst_node.refraction_index / c) * 1000.0
-        tower_ms = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
+        
         fiber_entry_ms = transit_dst["fiber_time_ms"]
+        tower_ms = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
 
         hop_latency_ms = (
             fiber_exit_ms
@@ -120,6 +127,8 @@ def calculate_latency(req: LatencyRequest) -> LatencyResponse:
             atmosphere_entry_ms=round(atmosphere_entry_ms, 6),
             tower_ms=round(tower_ms, 6),
             fiber_entry_ms=round(fiber_entry_ms, 6),
+            src_tower_delay_ms=round(transit_src["tower_delay_ms"], 6),
+            dst_tower_delay_ms=round(transit_dst["tower_delay_ms"], 6),
         )
 
         hops.append(

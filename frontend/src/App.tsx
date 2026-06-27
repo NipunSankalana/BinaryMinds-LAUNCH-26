@@ -113,6 +113,8 @@ function App() {
             payload_sent_codex: "",
             payload_received_ascii: "",
             binary_stream: binStream,
+            src_tower_delay_ms: hop.breakdown.src_tower_delay_ms || 0,
+            dst_tower_delay_ms: hop.breakdown.dst_tower_delay_ms || 0,
           };
         });
 
@@ -304,7 +306,7 @@ function App() {
           const currentPlanet   = config.nodes.find(n => n.id === currentPlanetId)!;
           const nextPlanet      = config.nodes.find(n => n.id === nextPlanetId)!;
           const hopInfo = hopLogs[hopIdx];
-          const lb      = hopInfo.latency_breakdown;
+          const lb      = packet.hop_log[hopIdx].latency_breakdown;
 
           // Tower pair for this void hop
           const { towerA, towerB } = findClosestTowerPair(
@@ -312,9 +314,6 @@ function App() {
             config.universe_metadata.coordinate_scale_unit_km || 100000
           );
 
-          // Ingress tower at the SOURCE planet:
-          // • hopIdx === 0 → origin planet, packet starts internally (no prior hop ingress)
-          // • hopIdx  > 0 → the ingress tower was towerB of the PREVIOUS hop
           const prevHopInfo     = hopIdx > 0 ? hopLogs[hopIdx - 1] : null;
           const prevTowerB      = prevHopInfo
             ? findClosestTowerPair(
@@ -328,31 +327,37 @@ function App() {
             ? 'Local Ingress'
             : `Ingress Tower ${prevTowerB}`;
 
-          // Egress tower for the NEXT planet's relay arc:
-          // If nextPlanet is an intermediate relay, its egress toward hop[i+2] is towerA of hop[i+1]
-          const isNextFinalDest = hopIdx === path.length - 2;
-          const nextHopInfo     = !isNextFinalDest && hopIdx + 1 < hopLogs.length
-            ? hopLogs[hopIdx + 1]
-            : null;
-          const nextEgressTower = !isNextFinalDest && nextHopInfo
-            ? findClosestTowerPair(
-                nextPlanet,
-                config.nodes.find(n => n.id === path[hopIdx + 2])!,
-                config.universe_metadata.coordinate_scale_unit_km || 100000
-              ).towerA
-            : null;
+          // 1. Log Consolidated Planet Transit (Tp) Atomically at start of transit evaluation:
+          if (hopIdx === 0) {
+            // Origin planet internal transit
+            const originFiber = lb.fiber_exit_ms;
+            const originTower = lb.src_tower_delay_ms || 0.0;
+            const originTotal = originFiber + originTower;
+            appendLog(`[PLANET ${currentPlanetId}] Internal Transit: Local Ingress → Egress Tower ${towerA}`, 'plain');
+            appendLog(`  ▶ Subsurface fiber propagation: (+${originFiber.toFixed(3)} ms)`, 'plain');
+            appendLog(`  ▶ Tower switching delay: (+${originTower.toFixed(3)} ms)`, 'plain');
+            appendLog(`  ✓ Node transit latency (Tp): ${originTotal.toFixed(3)} ms`, 'warning');
+          } else {
+            // Relay planet internal transit
+            const relayFiber = lb.fiber_exit_ms;
+            const relayTower = lb.src_tower_delay_ms || 0.0;
+            const relayTotal = relayFiber + relayTower;
+            appendLog(`[PLANET ${currentPlanetId}] Internal Transit: ${srcIngressLabel} → Egress Tower ${towerA}`, 'plain');
+            appendLog(`  ▶ Subsurface fiber ring transit: (+${relayFiber.toFixed(3)} ms)`, 'plain');
+            appendLog(`  ▶ Tower switching delay: (+${relayTower.toFixed(3)} ms)`, 'plain');
+            appendLog(`  ✓ Node transit latency (Tp): ${relayTotal.toFixed(3)} ms`, 'warning');
+          }
 
+          // 2. Clean Inter-planetary Transmission Hop Block:
           const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
           const binStream      = serializeToBinaryStream(payloadText, nextPlanet.codex);
           const binPreview     = binStream.length > 40 ? binStream.slice(0, 40) + '...' : binStream;
 
-          // ── PRE-VOID: source planet egress ──────────────────────────────────
-          appendLog(`\n[HOP ${hopIdx + 1}] ${currentPlanetId} → ${nextPlanetId}`, 'plain');
+          appendLog(`\n[HOP ${hopIdx + 1}] ${currentPlanetId} (Tower ${towerA}) → ${nextPlanetId} (Tower ${towerB})`, 'plain');
           appendLog(`  ▶ [ENC] Translate payload (ASCII → Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
           appendLog(`  ▶ [BIN] Serialized binary stream for laser TX: ${binPreview}`, 'info');
-          appendLog(`  ▶ [PLANET ${currentPlanetId}] Subsurface fiber: ${srcIngressLabel} → Egress Tower ${towerA}  (+${lb.fiber_exit_ms.toFixed(2)} ms)`, 'plain');
-          appendLog(`  ▶ [SPACE] Egress atmosphere at ${currentPlanetId}  (+${lb.atmosphere_exit_ms.toFixed(2)} ms)`, 'info');
-          appendLog(`  ▶ [SPACE] Void laser transit: ${hopInfo.void_distance_km.toLocaleString()} km  (+${lb.void_ms.toFixed(2)} ms)`, 'info');
+          appendLog(`  ▶ [SPACE] Egress atmosphere at ${currentPlanetId}  (+${lb.atmosphere_exit_ms.toFixed(3)} ms)`, 'info');
+          appendLog(`  ▶ [SPACE] Void laser transit: ${hopInfo.void_distance_km.toLocaleString()} km  (+${lb.void_ms.toFixed(3)} ms)`, 'info');
 
           let p = 0;
           const duration    = 1800;
@@ -366,20 +371,23 @@ function App() {
               clearInterval(progressInterval);
               setPacketProgress({ currentHopIndex: hopIdx, progress: 1 });
 
-              // ── POST-VOID: destination planet ingress ──────────────────────
-              appendLog(`  ▶ [SPACE] Ingress atmosphere at ${nextPlanetId}  (+${lb.atmosphere_entry_ms.toFixed(2)} ms)`, 'info');
-              appendLog(`  ▶ [PLANET ${nextPlanetId}] Ingress Tower ${towerB}: signal received & processed  (+${lb.tower_ms.toFixed(2)} ms)`, 'success');
+              // Post-void entry at destination:
+              appendLog(`  ▶ [SPACE] Ingress atmosphere at ${nextPlanetId}  (+${lb.atmosphere_entry_ms.toFixed(3)} ms)`, 'info');
+              appendLog(`  ▶ [PLANET ${nextPlanetId}] Ingress Tower ${towerB}: Laser link established`, 'success');
 
-              if (isNextFinalDest) {
-                // Final destination: fiber arc to ground station
-                appendLog(`  ▶ [PLANET ${nextPlanetId}] Subsurface fiber: Ingress Tower ${towerB} → client endpoint  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
-              } else {
-                // Intermediate relay: fiber arc across ring to egress toward next hop
-                appendLog(`  ▶ [PLANET ${nextPlanetId}] Ring arc (Tp): Ingress Tower ${towerB} → Egress Tower ${nextEgressTower}  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
+              // If nextPlanet is final destination, log its internal transit atomically:
+              if (hopIdx === path.length - 2) {
+                const destFiber = lb.fiber_entry_ms;
+                const destTower = lb.dst_tower_delay_ms || 0.0;
+                const destTotal = destFiber + destTower;
+                appendLog(`\n[PLANET ${nextPlanetId}] Internal Transit: Ingress Tower ${towerB} → Local Endpoint`, 'plain');
+                appendLog(`  ▶ Subsurface fiber propagation: (+${destFiber.toFixed(3)} ms)`, 'plain');
+                appendLog(`  ▶ Tower switching delay: (+${destTower.toFixed(3)} ms)`, 'plain');
+                appendLog(`  ✓ Node transit latency (Tp): ${destTotal.toFixed(3)} ms`, 'warning');
               }
 
               appendLog(`  ▶ [DEC] Decoded Base ${nextPlanet.codex} → ASCII: "${payloadText}"`, 'success');
-              appendLog(`  ✓ Hop latency total: ${hopInfo.total_hop_latency_ms.toFixed(2)} ms`, 'warning');
+              appendLog(`  ✓ Hop latency total: ${hopInfo.total_hop_latency_ms.toFixed(3)} ms`, 'warning');
 
               hopIdx++;
               if (hopIdx < path.length - 1) {

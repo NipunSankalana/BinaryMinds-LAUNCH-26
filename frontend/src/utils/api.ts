@@ -55,6 +55,8 @@ export interface LatencyBreakdown {
   atmosphere_entry_ms: number;
   tower_ms: number;
   fiber_entry_ms: number;
+  src_tower_delay_ms?: number;
+  dst_tower_delay_ms?: number;
 }
 
 export interface HopEntry {

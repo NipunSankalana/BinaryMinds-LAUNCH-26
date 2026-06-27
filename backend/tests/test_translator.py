@@ -55,7 +55,7 @@ def test_empty_payload():
 
 
 def test_translate_hop_returns_encoded_and_decoded():
-    encoded, decoded = translate_hop("HELLO", source_codex=8, dest_codex=16)
+    encoded, decoded, binary_stream = translate_hop("HELLO", source_codex=8, dest_codex=16)
     assert decoded == "HELLO"
     assert "48" in encoded   # H=72=0x48
 

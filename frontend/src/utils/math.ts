@@ -37,6 +37,8 @@ export interface HopLogEntry {
   payload_sent_codex: string;
   payload_received_ascii: string;
   binary_stream?: string;  // flat bit-stream for laser transmission
+  src_tower_delay_ms?: number;
+  dst_tower_delay_ms?: number;
 }
 
 export interface RouteResult {
