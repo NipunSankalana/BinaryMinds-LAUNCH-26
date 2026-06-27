@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { DEFAULT_SPEED_OF_LIGHT, DEFAULT_TOWER_DELAY, DEFAULT_MAX_VOID_HOP, DEFAULT_SCALE_UNIT, DEFAULT_FIBER_SPEED_FRACTION } from '../utils/math';
 import type { UniverseConfig } from '../utils/math';
-import { Upload, Play, RefreshCw, Layers, Cpu } from 'lucide-react';
+import { Upload, Play, RefreshCw, Layers, Cpu, Compass, Settings, CircleAlert } from 'lucide-react';
 
 interface ControlPanelProps {
   config: UniverseConfig | null;
@@ -68,19 +68,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   return (
     <div className="flex flex-col gap-6">
       {/* Configuration Loading Panel */}
-      <div className="glass-panel p-5 border border-solid">
-        <h3 className="text-xs uppercase font-semibold text-[#00f2fe] tracking-wider mb-4 flex items-center gap-1.5 font-display">
-          <Layers className="w-4 h-4" /> Config Ingestion
+      <div className="glass-panel p-5 border border-solid border-white/5 bg-slate-950/40 relative">
+        {/* Futuristic top-corner visual line */}
+        <div className="absolute top-0 right-0 w-8 h-1 bg-cyber-cyan shadow-[0_0_10px_#00f2fe]"></div>
+
+        <h3 className="text-xs uppercase font-bold text-[#00f2fe] tracking-widest mb-4 flex items-center gap-2 font-display">
+          <Layers className="w-4 h-4 text-cyber-cyan" /> Config Ingestion
         </h3>
         
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-2">
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-3">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="btn-secondary flex-1 flex items-center justify-center gap-2 py-2"
+              className="btn-secondary flex-1 flex items-center justify-center gap-2 py-2.5 text-[0.7rem]"
               disabled={isSimulating}
             >
-              <Upload className="w-4 h-4" /> Upload JSON
+              <Upload className="w-3.5 h-3.5 text-slate-400" /> Upload JSON
             </button>
             <input
               type="file"
@@ -91,45 +94,45 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             />
             <button
               onClick={onLoadDefaultUniverse}
-              className="btn-primary text-xs flex-1 flex items-center justify-center gap-2 py-2"
+              className="btn-primary text-[0.7rem] flex-1 flex items-center justify-center gap-2 py-2.5"
               disabled={isSimulating}
             >
-              <Cpu className="w-4 h-4" /> Default Zeta-26
+              <Cpu className="w-3.5 h-3.5" /> Load Zeta-26
             </button>
           </div>
           
           {config && (
-            <div className="bg-[#05070c] border border-solid rounded p-3 text-[0.7rem] text-slate-400 font-mono flex flex-col gap-1">
-              <div className="text-slate-300 font-semibold border-b border-solid pb-1 mb-1">
-                Universe Constants:
+            <div className="bg-[#020408] border border-solid border-white/5 rounded-lg p-3 text-[0.7rem] text-slate-400 font-mono flex flex-col gap-1.5 shadow-inner">
+              <div className="text-slate-300 font-bold border-b border-solid border-white/5 pb-1 mb-1.5 flex items-center gap-1.5">
+                <Settings className="w-3 h-3 text-cyber-cyan" /> System Constants:
               </div>
               <div className="flex justify-between">
-                <span>Speed of Light:</span>
-                <span className="text-[#05ffb0]">
+                <span className="text-slate-500">Speed of Light (c):</span>
+                <span className="text-[#05ffb0] font-semibold">
                   {(config.universe_metadata?.speed_of_light_kms ?? DEFAULT_SPEED_OF_LIGHT).toLocaleString()} km/s
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Tower Penalty:</span>
-                <span className="text-[#05ffb0]">
+                <span className="text-slate-500">Tower Delay (Δt):</span>
+                <span className="text-[#05ffb0] font-semibold">
                   {config.universe_metadata?.tower_processing_delay_ms ?? DEFAULT_TOWER_DELAY} ms
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Max Void Hop:</span>
-                <span className="text-[#05ffb0]">
+                <span className="text-slate-500">Max Hop Limit:</span>
+                <span className="text-[#05ffb0] font-semibold">
                   {((config.universe_metadata?.max_void_hop_distance_km ?? DEFAULT_MAX_VOID_HOP) / 1000000).toFixed(0)}M km
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Coordinate Scale:</span>
-                <span className="text-[#05ffb0]">
+                <span className="text-slate-500">Coordinate Scale:</span>
+                <span className="text-[#05ffb0] font-semibold">
                   {(config.universe_metadata?.coordinate_scale_unit_km ?? DEFAULT_SCALE_UNIT).toLocaleString()} km
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Fiber Speed:</span>
-                <span className="text-[#05ffb0]">
+                <span className="text-slate-500">Fiber speed factor:</span>
+                <span className="text-[#05ffb0] font-semibold">
                   {config.universe_metadata?.fiber_speed_fraction ?? DEFAULT_FIBER_SPEED_FRACTION} c
                 </span>
               </div>
@@ -140,14 +143,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
       {/* Packet Transmission Form */}
       {config && (
-        <div className="glass-panel p-5 border border-solid flex flex-col gap-4">
-          <h3 className="text-xs uppercase font-semibold text-[#00f2fe] tracking-wider flex items-center gap-1.5 font-display">
-            <Play className="w-4 h-4" /> Beam Setup
+        <div className="glass-panel p-5 border border-solid border-white/5 bg-slate-950/40 flex flex-col gap-4 relative">
+          <div className="absolute top-0 right-0 w-8 h-1 bg-cyber-orange shadow-[0_0_10px_#f59e0b]"></div>
+
+          <h3 className="text-xs uppercase font-bold text-cyber-orange tracking-widest flex items-center gap-2 font-display">
+            <Compass className="w-4 h-4 text-cyber-orange" /> Laser Beam Setup
           </h3>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[0.7rem] uppercase tracking-wider text-slate-400 font-medium font-display">
-              Origin Planet
+            <label className="text-[0.65rem] uppercase tracking-wider text-slate-400 font-semibold font-display">
+              Origin Star Planet
             </label>
             <select
               value={selectedOrigin || ''}
@@ -156,9 +161,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 setStartTower(0);
               }}
               disabled={isSimulating}
-              className="w-full text-xs"
+              className="w-full text-xs bg-slate-950/80 border border-white/10 rounded-lg text-slate-300 py-2.5 px-3 focus:border-cyber-cyan"
             >
-              <option value="">-- Choose Origin --</option>
+              <option value="">-- Select Origin --</option>
               {config.nodes.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.id} (Base {n.codex})
@@ -168,15 +173,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
 
           {originNode && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[0.7rem] uppercase tracking-wider text-slate-400 font-medium font-display">
+            <div className="flex flex-col gap-1.5 animate-fadeIn">
+              <label className="text-[0.65rem] uppercase tracking-wider text-slate-400 font-semibold font-display">
                 Origin Start Tower
               </label>
               <select
                 value={startTower}
                 onChange={(e) => setStartTower(parseInt(e.target.value))}
                 disabled={isSimulating}
-                className="w-full text-xs font-mono"
+                className="w-full text-xs font-mono bg-slate-950/80 border border-white/10 rounded-lg text-slate-300 py-2.5 px-3 focus:border-cyber-cyan"
               >
                 {Array.from({ length: originNode.active_towers }).map((_, idx) => (
                   <option key={idx} value={idx}>
@@ -188,8 +193,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[0.7rem] uppercase tracking-wider text-slate-400 font-medium font-display">
-              Destination Planet
+            <label className="text-[0.65rem] uppercase tracking-wider text-slate-400 font-semibold font-display">
+              Destination Star Planet
             </label>
             <select
               value={selectedDest || ''}
@@ -198,9 +203,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 setEndTower(0);
               }}
               disabled={isSimulating}
-              className="w-full text-xs"
+              className="w-full text-xs bg-slate-950/80 border border-white/10 rounded-lg text-slate-300 py-2.5 px-3 focus:border-cyber-cyan"
             >
-              <option value="">-- Choose Destination --</option>
+              <option value="">-- Select Destination --</option>
               {config.nodes.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.id} (Base {n.codex})
@@ -210,15 +215,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
 
           {destNode && (
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[0.7rem] uppercase tracking-wider text-slate-400 font-medium font-display">
+            <div className="flex flex-col gap-1.5 animate-fadeIn">
+              <label className="text-[0.65rem] uppercase tracking-wider text-slate-400 font-semibold font-display">
                 Destination Exit Tower
               </label>
               <select
                 value={endTower}
                 onChange={(e) => setEndTower(parseInt(e.target.value))}
                 disabled={isSimulating}
-                className="w-full text-xs font-mono"
+                className="w-full text-xs font-mono bg-slate-950/80 border border-white/10 rounded-lg text-slate-300 py-2.5 px-3 focus:border-cyber-cyan"
               >
                 {Array.from({ length: destNode.active_towers }).map((_, idx) => (
                   <option key={idx} value={idx}>
@@ -230,32 +235,39 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           )}
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-[0.7rem] uppercase tracking-wider text-slate-400 font-medium font-display">
-              Message Payload (ASCII)
+            <label className="text-[0.65rem] uppercase tracking-wider text-slate-400 font-semibold font-display">
+              Payload Message (ASCII)
             </label>
             <input
               type="text"
               value={payloadText}
               onChange={(e) => setPayloadText(e.target.value)}
               disabled={isSimulating}
-              className="text-xs"
+              className="text-xs bg-slate-950/80 border border-white/10 rounded-lg text-slate-300 py-2.5 px-3 focus:border-cyber-cyan"
               placeholder="e.g. Hello world"
             />
           </div>
 
-          <div className="flex gap-2 mt-2">
+          {selectedOrigin && selectedDest && selectedOrigin === selectedDest && (
+            <div className="flex items-center gap-2 p-2 bg-cyber-red/10 border border-cyber-red/30 rounded-lg text-[0.65rem] text-cyber-red font-mono">
+              <CircleAlert className="w-4 h-4 shrink-0" />
+              <span>Origin and Destination cannot be the same.</span>
+            </div>
+          )}
+
+          <div className="flex gap-3 mt-3">
             <button
               onClick={onRunSimulation}
-              disabled={isSimulating || !selectedOrigin || !selectedDest}
-              className="btn-primary flex-1 py-2.5 flex items-center justify-center gap-2"
+              disabled={isSimulating || !selectedOrigin || !selectedDest || selectedOrigin === selectedDest}
+              className="btn-primary flex-1 py-3 flex items-center justify-center gap-2 text-xs"
             >
-              <Play className="w-4 h-4 fill-black" /> Send Laser
+              <Play className="w-3.5 h-3.5 fill-black" /> Fire Laser Pulse
             </button>
             <button
               onClick={onResetSimulation}
-              className="btn-secondary py-2.5 flex items-center justify-center px-4"
+              className="btn-secondary py-3 flex items-center justify-center px-4 hover:border-cyber-red hover:text-cyber-red hover:bg-cyber-red/5"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

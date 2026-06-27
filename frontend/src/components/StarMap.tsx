@@ -1,6 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
+import ReactFlow, {
+  Background,
+  BackgroundVariant,
+  Controls,
+  useNodesState,
+  useEdgesState,
+  Edge,
+  Node,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { PlanetNode } from './PlanetNode';
+import { LaserEdge } from './LaserEdge';
 import type { Planet, UniverseConfig, RouteResult } from '../utils/math';
-import { Power, Activity } from 'lucide-react';
+import { Activity, ShieldAlert, Zap } from 'lucide-react';
 
 interface StarMapProps {
   config: UniverseConfig | null;
@@ -14,6 +26,14 @@ interface StarMapProps {
   packetProgress: { currentHopIndex: number; progress: number } | null;
 }
 
+const nodeTypes = {
+  planet: PlanetNode,
+};
+
+const edgeTypes = {
+  laser: LaserEdge,
+};
+
 export const StarMap: React.FC<StarMapProps> = ({
   config,
   selectedOrigin,
@@ -23,460 +43,181 @@ export const StarMap: React.FC<StarMapProps> = ({
   killedNodes,
   onToggleNodeKilled,
   activeRoute,
-  packetProgress,
 }) => {
-  const [hoveredNode, setHoveredNode] = useState<Planet | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   const scale = config?.universe_metadata?.coordinate_scale_unit_km ?? 100000;
   const maxVoidHop = config?.universe_metadata?.max_void_hop_distance_km ?? 50000000;
 
-  // Width and Height of visual StarMap area
-  const svgWidth = 800;
-  const svgHeight = 550;
-  const padding = 70;
-
-  // Auto-scale coordinates to fit viewbox
-  const bounds = useMemo(() => {
-    if (!config || config.nodes.length === 0) {
-      return { minX: -10, maxX: 10, minY: -10, maxY: 10 };
-    }
-    const xs = config.nodes.map((n) => n.x);
-    const ys = config.nodes.map((n) => n.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-
-    // Add some buffer to bounds
-    const dx = maxX - minX || 2;
-    const dy = maxY - minY || 2;
+  // React Flow node positioning scaling
+  const mapCoords = (x: number, y: number) => {
     return {
-      minX: minX - dx * 0.15,
-      maxX: maxX + dx * 0.15,
-      minY: minY - dy * 0.15,
-      maxY: maxY + dy * 0.15,
-    };
-  }, [config]);
-
-  // Convert Cartesian to Screen coords
-  const toScreen = (x: number, y: number) => {
-    const { minX, maxX, minY, maxY } = bounds;
-    const rx = (x - minX) / (maxX - minX);
-    const ry = (y - minY) / (maxY - minY);
-
-    return {
-      x: padding + rx * (svgWidth - 2 * padding),
-      y: svgHeight - (padding + ry * (svgHeight - 2 * padding)), // Invert Y
+      x: x * 1.6 + 250,
+      y: -y * 1.3 + 300, // Invert Y and offset
     };
   };
 
+  // Synchronize config nodes with React Flow nodes state
+  useEffect(() => {
+    if (!config) return;
+
+    const flowNodes: Node[] = config.nodes.map((n) => {
+      const pos = mapCoords(n.x, n.y);
+      const isOrigin = selectedOrigin === n.id;
+      const isDest = selectedDest === n.id;
+      const isKilled = killedNodes.has(n.id);
+      const isRoute = activeRoute ? activeRoute.path.includes(n.id) : false;
+
+      return {
+        id: n.id,
+        type: 'planet',
+        position: pos,
+        dragHandle: '.drag-handle', // allow drag only via header/tag if needed (false = drag node directly)
+        data: {
+          id: n.id,
+          name: n.id,
+          codex: n.codex,
+          radius_km: n.radius_km,
+          active_towers: n.active_towers,
+          atmosphere_thickness_km: n.atmosphere_thickness_km,
+          refraction_index: n.refraction_index,
+          isOrigin,
+          isDest,
+          isKilled,
+          isRoute,
+        },
+      };
+    });
+
+    setNodes(flowNodes);
+  }, [config, selectedOrigin, selectedDest, killedNodes, activeRoute, setNodes]);
+
+  // Synchronize links with React Flow edges state
+  useEffect(() => {
+    if (!config) return;
+
+    const flowEdges: Edge[] = [];
+
+    for (let i = 0; i < config.nodes.length; i++) {
+      const nA = config.nodes[i];
+      for (let j = i + 1; j < config.nodes.length; j++) {
+        const nB = config.nodes[j];
+
+        // Calculate void distance in km
+        const dx = nA.x - nB.x;
+        const dy = nA.y - nB.y;
+        const distCenters = Math.sqrt(dx * dx + dy * dy) * scale;
+        const voidDist = distCenters - (nA.radius_km + nA.atmosphere_thickness_km) - (nB.radius_km + nB.atmosphere_thickness_km);
+
+        if (voidDist <= maxVoidHop) {
+          // Link exists
+          const isKilled = killedNodes.has(nA.id) || killedNodes.has(nB.id);
+          
+          // Check if this edge is active in the routing path
+          let isActive = false;
+          if (activeRoute && activeRoute.path.includes(nA.id) && activeRoute.path.includes(nB.id)) {
+            const idxA = activeRoute.path.indexOf(nA.id);
+            const idxB = activeRoute.path.indexOf(nB.id);
+            isActive = Math.abs(idxA - idxB) === 1;
+          }
+
+          flowEdges.push({
+            id: `${nA.id}-${nB.id}`,
+            source: nA.id,
+            target: nB.id,
+            type: 'laser',
+            data: {
+              isActive,
+              isKilled,
+              voidDist,
+            },
+            animated: isActive && !isKilled,
+          });
+        }
+      }
+    }
+
+    setEdges(flowEdges);
+  }, [config, killedNodes, activeRoute, scale, maxVoidHop, setEdges]);
+
   if (!config) {
     return (
-      <div className="glass-panel w-full h-[400px] flex flex-col items-center justify-center text-center p-8">
-        <Activity className="w-12 h-12 text-slate-500 animate-pulse mb-4" />
-        <h3 className="text-xl text-slate-400 font-medium">Star Map Offline</h3>
-        <p className="text-sm text-slate-500 max-w-sm mt-2">
-          Initialize the universe config to scan and map the star system.
+      <div className="glass-panel w-full h-[500px] flex flex-col items-center justify-center text-center p-8">
+        <Activity className="w-12 h-12 text-cyber-cyan animate-pulse mb-4" />
+        <h3 className="text-xl text-slate-300 font-semibold tracking-wider font-display">Tactical Star Map Offline</h3>
+        <p className="text-sm text-slate-500 max-w-sm mt-2 font-sans">
+          Initialize the universe config to establish local telemetry links and map the star system.
         </p>
       </div>
     );
   }
 
-  // Draw grid lines (separate arrays for safe type checking)
-  const verticalGridVals: number[] = [];
-  const horizontalGridVals: number[] = [];
-  const gridDivs = 10;
-  const { minX, maxX, minY, maxY } = bounds;
-  for (let i = 1; i < gridDivs; i++) {
-    verticalGridVals.push(minX + (i * (maxX - minX)) / gridDivs);
-    horizontalGridVals.push(minY + (i * (maxY - minY)) / gridDivs);
-  }
-
-  // Draw links between planets that are within void hop distance
-  const links: { from: string; to: string; x1: number; y1: number; x2: number; y2: number; distKm: number; active: boolean; isKilled: boolean }[] = [];
-  for (let i = 0; i < config.nodes.length; i++) {
-    const nA = config.nodes[i];
-    const posA = toScreen(nA.x, nA.y);
-    for (let j = i + 1; j < config.nodes.length; j++) {
-      const nB = config.nodes[j];
-      const posB = toScreen(nB.x, nB.y);
-
-      // Check distance in km
-      const dx = nA.x - nB.x;
-      const dy = nA.y - nB.y;
-      const distCenters = Math.sqrt(dx * dx + dy * dy) * scale;
-      const voidDist = distCenters - (nA.radius_km + nA.atmosphere_thickness_km) - (nB.radius_km + nB.atmosphere_thickness_km);
-
-      if (voidDist <= maxVoidHop) {
-        // Link exists
-        const active = !!(activeRoute?.path.includes(nA.id) && activeRoute?.path.includes(nB.id) && Math.abs(activeRoute.path.indexOf(nA.id) - activeRoute.path.indexOf(nB.id)) === 1);
-        const isKilled = killedNodes.has(nA.id) || killedNodes.has(nB.id);
-
-        links.push({
-          from: nA.id,
-          to: nB.id,
-          x1: posA.x,
-          y1: posA.y,
-          x2: posB.x,
-          y2: posB.y,
-          distKm: voidDist,
-          active,
-          isKilled,
-        });
-      }
-    }
-  }
-
-  // Animating packet dot coordinates
-  let packetX = 0;
-  let packetY = 0;
-  let showPacketDot = false;
-
-  if (packetProgress && activeRoute && activeRoute.path.length > 1) {
-    const { currentHopIndex, progress } = packetProgress;
-    if (currentHopIndex < activeRoute.path.length - 1) {
-      const fromNodeId = activeRoute.path[currentHopIndex];
-      const toNodeId = activeRoute.path[currentHopIndex + 1];
-      const fromNode = config.nodes.find((n) => n.id === fromNodeId);
-      const toNode = config.nodes.find((n) => n.id === toNodeId);
-
-      if (fromNode && toNode) {
-        const fromPos = toScreen(fromNode.x, fromNode.y);
-        const toPos = toScreen(toNode.x, toNode.y);
-
-        // Linear interpolation of coordinate positions
-        packetX = fromPos.x + (toPos.x - fromPos.x) * progress;
-        packetY = fromPos.y + (toPos.y - fromPos.y) * progress;
-        showPacketDot = true;
-      }
-    }
-  }
-
-  const handlePlanetClick = (planet: Planet) => {
-    // If it's killed, we should alert
-    if (killedNodes.has(planet.id)) {
-      onToggleNodeKilled(planet.id); // Toggle it back to active
-      return;
-    }
-
-    if (!selectedOrigin) {
-      onSelectOrigin(planet.id);
-    } else if (!selectedDest && selectedOrigin !== planet.id) {
-      onSelectDest(planet.id);
-    } else {
-      onSelectOrigin(planet.id);
-      onSelectDest(null);
-    }
-  };
-
-  const showTooltip = (e: React.MouseEvent, planet: Planet) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mapContainer = e.currentTarget.closest('.map-container')?.getBoundingClientRect();
-    if (mapContainer) {
-      setTooltipPos({
-        x: rect.left - mapContainer.left + rect.width / 2,
-        y: rect.top - mapContainer.top - 100,
-      });
-    }
-    setHoveredNode(planet);
-  };
-
   return (
-    <div className="glass-panel flex flex-col relative w-full border border-solid p-6 overflow-hidden map-container">
-      {/* StarMap Header */}
-      <div className="flex justify-between items-center mb-4">
+    <div className="glass-panel w-full h-[580px] flex flex-col relative border-cyber-cyan/10">
+      {/* HUD Header */}
+      <div className="px-5 py-3.5 border-b border-solid border-white/5 bg-slate-950/40 flex justify-between items-center z-10">
         <div className="flex items-center gap-2">
-          <Activity className="w-5 h-5 text-[#00f2fe]" />
-          <h2 className="text-md uppercase font-semibold text-[#00f2fe]">Zeta-26 Tactical Overlay</h2>
+          <Zap className="w-4 h-4 text-cyber-cyan animate-pulse" />
+          <h3 className="text-xs font-bold uppercase text-[#00f2fe] tracking-widest font-display">
+            Zeta-26 Space Grid Telemetry Map
+          </h3>
         </div>
-        <div className="flex gap-4 text-xs font-medium text-slate-400">
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 bg-[#00f2fe] rounded-full inline-block"></span> Origin
+        <div className="flex gap-4 text-[0.65rem] font-mono text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyber-green inline-block"></span>
+            <span>Origin</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 bg-[#05ffb0] rounded-full inline-block"></span> Destination
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyber-purple inline-block"></span>
+            <span>Dest</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 bg-[#ff3366] rounded-full inline-block"></span> Offline (Killed)
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyber-orange inline-block"></span>
+            <span>Active Hop</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-cyber-red inline-block"></span>
+            <span>Killed</span>
           </div>
         </div>
       </div>
 
-      {/* SVG Canvas */}
-      <div className="bg-[#04060b] rounded-lg border border-solid overflow-hidden relative" style={{ height: svgHeight }}>
-        <svg width="100%" height="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="xMidYMid meet">
-          {/* Defs for gradients, filters, shadows */}
-          <defs>
-            <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-            <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-            <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
+      {/* React Flow Container */}
+      <div className="flex-grow w-full h-full bg-[#020408]/90 relative">
+        {/* Terminal Scanline overlay */}
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/[0.008] to-transparent bg-[size:100%_4px] z-10"></div>
+        
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.15 }}
+          zoomOnScroll={false}
+          panOnDrag={true}
+          preventScrolling={true}
+          nodesConnectable={false}
+          nodesDraggable={true}
+        >
+          <Background color="#1e293b" gap={18} size={1} variant={BackgroundVariant.Lines} />
+          <Controls className="react-flow-controls-custom bg-slate-900 border border-white/10 text-white fill-white" />
+        </ReactFlow>
+      </div>
 
-          {/* Grid Background */}
-          {verticalGridVals.map((xVal, idx) => {
-            const screenPos = toScreen(xVal, minY);
-            return (
-              <line
-                key={`v-${idx}`}
-                x1={screenPos.x}
-                y1={0}
-                x2={screenPos.x}
-                y2={svgHeight}
-                stroke="rgba(255,255,255,0.02)"
-                strokeWidth="1"
-              />
-            );
-          })}
-          {horizontalGridVals.map((yVal, idx) => {
-            const screenPos = toScreen(minX, yVal);
-            return (
-              <line
-                key={`h-${idx}`}
-                x1={0}
-                y1={screenPos.y}
-                x2={svgWidth}
-                y2={screenPos.y}
-                stroke="rgba(255,255,255,0.02)"
-                strokeWidth="1"
-              />
-            );
-          })}
-
-          {/* Links */}
-          {links.map((link, idx) => {
-            const isRouteEdge = activeRoute?.path.includes(link.from) && activeRoute?.path.includes(link.to) && Math.abs(activeRoute.path.indexOf(link.from) - activeRoute.path.indexOf(link.to)) === 1;
-
-            return (
-              <g key={idx}>
-                {isRouteEdge ? (
-                  // Laser Link (Active Path)
-                  <line
-                    x1={link.x1}
-                    y1={link.y1}
-                    x2={link.x2}
-                    y2={link.y2}
-                    stroke={link.isKilled ? '#ff3366' : '#05ffb0'}
-                    strokeWidth="3.5"
-                    className="laser-beam"
-                    filter="url(#glow-green)"
-                  />
-                ) : (
-                  // Inactive / Void limit link
-                  <line
-                    x1={link.x1}
-                    y1={link.y1}
-                    x2={link.x2}
-                    y2={link.y2}
-                    stroke={link.isKilled ? 'rgba(255,51,102,0.1)' : 'rgba(255,255,255,0.05)'}
-                    strokeWidth="1.5"
-                    strokeDasharray="4 4"
-                  />
-                )}
-              </g>
-            );
-          })}
-
-          {/* Planets and Atmos */}
-          {config.nodes.map((planet) => {
-            const pos = toScreen(planet.x, planet.y);
-            const isOrigin = selectedOrigin === planet.id;
-            const isDest = selectedDest === planet.id;
-            const isKilled = killedNodes.has(planet.id);
-            const rPx = 18 + planet.radius_km / 1200; // Visual radius mapping
-            const atmosPx = rPx + 6 + planet.atmosphere_thickness_km / 40;
-
-            let strokeColor = 'rgba(255,255,255,0.15)';
-            let glowFilter = '';
-
-            if (isOrigin) {
-              strokeColor = '#00f2fe';
-              glowFilter = 'url(#glow-cyan)';
-            } else if (isDest) {
-              strokeColor = '#05ffb0';
-              glowFilter = 'url(#glow-green)';
-            } else if (isKilled) {
-              strokeColor = '#ff3366';
-              glowFilter = 'url(#glow-red)';
-            }
-
-            return (
-              <g
-                key={planet.id}
-                className="cursor-pointer select-none group"
-                onClick={() => handlePlanetClick(planet)}
-                onMouseEnter={(e) => showTooltip(e, planet)}
-                onMouseLeave={() => setHoveredNode(null)}
-              >
-                {/* Orbit/Atmosphere Halo Ring */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={atmosPx}
-                  fill="transparent"
-                  stroke={isKilled ? 'rgba(255, 51, 102, 0.15)' : isOrigin ? 'rgba(0, 242, 254, 0.15)' : isDest ? 'rgba(5, 255, 176, 0.15)' : 'rgba(255,255,255,0.03)'}
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                />
-
-                {/* Subsurface Fiber Ring */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={rPx + 1}
-                  fill="transparent"
-                  stroke={isKilled ? 'rgba(255,51,102,0.3)' : 'rgba(255,255,255,0.1)'}
-                  strokeWidth="1"
-                />
-
-                {/* Planet Sphere */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={rPx}
-                  fill={isKilled ? 'rgba(30,10,20,0.8)' : 'rgba(17,24,39,0.9)'}
-                  stroke={strokeColor}
-                  strokeWidth={isOrigin || isDest || isKilled ? 2 : 1}
-                  filter={glowFilter}
-                />
-
-                {/* Draw Towers as small dots on the surface ring */}
-                {Array.from({ length: planet.active_towers }).map((_, tIdx) => {
-                  // Angle
-                  const N = planet.active_towers;
-                  const theta = Math.PI / 2 - (tIdx * 2 * Math.PI) / N;
-                  const tx = pos.x + rPx * Math.cos(theta);
-                  const ty = pos.y + rPx * Math.sin(theta);
-
-                  return (
-                    <circle
-                      key={tIdx}
-                      cx={tx}
-                      cy={ty}
-                      r="2"
-                      fill={isKilled ? '#ff3366' : '#94a3b8'}
-                      opacity={isKilled ? 0.4 : 0.8}
-                    />
-                  );
-                })}
-
-                {/* Planet Label */}
-                <text
-                  x={pos.x}
-                  y={pos.y + rPx + 20}
-                  textAnchor="middle"
-                  fill={isKilled ? '#ff3366' : isOrigin ? '#00f2fe' : isDest ? '#05ffb0' : '#e2e8f0'}
-                  className="text-[0.65rem] tracking-wider uppercase font-semibold font-display"
-                >
-                  {planet.id}
-                </text>
-
-                {/* Codex Label Indicator */}
-                <text
-                  x={pos.x}
-                  y={pos.y - rPx - 8}
-                  textAnchor="middle"
-                  fill="#64748b"
-                  className="text-[0.55rem] font-mono"
-                >
-                  B{planet.codex}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Packet Dot */}
-          {showPacketDot && (
-            <circle
-              cx={packetX}
-              cy={packetY}
-              r="6.5"
-              fill="#05ffb0"
-              filter="url(#glow-green)"
-              className="animate-ping"
-            />
-          )}
-        </svg>
-
-        {/* Floating Tooltip / Info Card */}
-        {hoveredNode && (
-          <div
-            className="absolute z-50 glass-panel glass-panel-accent-cyan p-4 w-64 rounded-md pointer-events-auto shadow-2xl transition-all select-none text-left"
-            style={{
-              left: Math.min(Math.max(10, tooltipPos.x - 128), svgWidth - 270),
-              top: Math.max(10, tooltipPos.y - 120),
-            }}
-          >
-            <div className="flex justify-between items-center border-b border-solid pb-1 mb-2">
-              <span className="font-display text-sm font-semibold tracking-wider text-[#00f2fe] uppercase">
-                {hoveredNode.id}
-              </span>
-              <span className="font-mono text-[0.65rem] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
-                CODEX BASE {hoveredNode.codex}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-[0.7rem] text-slate-400 font-sans">
-              <div>Coordinates:</div>
-              <div className="text-right text-slate-200 font-mono">
-                ({hoveredNode.x}, {hoveredNode.y})
-              </div>
-              
-              <div>Radius:</div>
-              <div className="text-right text-slate-200 font-mono">
-                {hoveredNode.radius_km.toLocaleString()} km
-              </div>
-
-              <div>Active Towers:</div>
-              <div className="text-right text-slate-200 font-mono">
-                {hoveredNode.active_towers}
-              </div>
-
-              <div>Atmosphere Thickness:</div>
-              <div className="text-right text-slate-200 font-mono">
-                {hoveredNode.atmosphere_thickness_km} km
-              </div>
-
-              <div>Refraction Index (n):</div>
-              <div className="text-right text-slate-200 font-mono">
-                {hoveredNode.refraction_index}
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-3 pt-2 border-t border-solid">
-              <button
-                className={`text-[0.65rem] font-display w-full py-1 rounded transition-colors ${
-                  killedNodes.has(hoveredNode.id)
-                    ? 'bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/30 text-emerald-400'
-                    : 'bg-rose-950/60 hover:bg-rose-900 border border-rose-500/30 text-[#ff3366]'
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleNodeKilled(hoveredNode.id);
-                }}
-              >
-                {killedNodes.has(hoveredNode.id) ? (
-                  <span className="flex items-center justify-center gap-1">
-                    <Power className="w-2.5 h-2.5" /> Restore Node
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-1">
-                    <Power className="w-2.5 h-2.5" /> Kill Planet
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Floating Instructions HUD */}
+      <div className="absolute bottom-4 left-4 z-10 glass-panel bg-slate-950/80 px-3.5 py-2.5 border-white/5 pointer-events-auto">
+        <h4 className="text-[0.65rem] font-bold text-cyber-cyan font-display mb-1 flex items-center gap-1">
+          <ShieldAlert className="w-3.5 h-3.5" /> GRID CONTROL MANUAL
+        </h4>
+        <ul className="text-[0.55rem] font-mono text-slate-400 list-disc list-inside space-y-0.5">
+          <li>Hover nodes to inspect atmosphere density (n).</li>
+          <li>Click a node on the Star Map sidebar to toggle ONLINE/OFFLINE.</li>
+          <li>Select endpoints using the dropdown panels on the right.</li>
+        </ul>
       </div>
     </div>
   );
