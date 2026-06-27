@@ -81,10 +81,9 @@ header.app-header {
   display: grid;
   grid-template-columns: 290px 1fr 340px;
   gap: 16px;
-  padding: 16px;
+  padding: 16px 16px 48px 16px;
   flex-grow: 1;
-  height: calc(100vh - 54px);
-  overflow: hidden;
+  min-height: calc(100vh - 54px);
   box-sizing: border-box;
 }
 
