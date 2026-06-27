@@ -67,6 +67,22 @@ function App() {
     }
   }, [packetProgress, activeRoute, config]);
 
+  const [inspectedPlanetId, setInspectedPlanetId] = useState<string>('Aegis');
+
+  // Sync inspected planet with selected origin
+  useEffect(() => {
+    if (selectedOrigin) {
+      setInspectedPlanetId(selectedOrigin);
+    }
+  }, [selectedOrigin]);
+
+  // Sync inspected planet with active hop during simulation
+  useEffect(() => {
+    if (isSimulating && activeHop) {
+      setInspectedPlanetId(activeHop.planetId);
+    }
+  }, [isSimulating, activeHop]);
+
   // Auto-calculate route on configuration, endpoints or chaos changes
   useEffect(() => {
     if (config && selectedOrigin && selectedDest) {
@@ -373,11 +389,6 @@ function App() {
             onToggleNodeKilled={handleToggleNodeKilled}
             onRepairAll={handleRepairAll}
           />
-          <PlanetTowersMap
-            config={config}
-            activeHop={activeHop}
-            isSimulating={isSimulating}
-          />
         </div>
 
         {/* Center Canvas & Metrics */}
@@ -392,6 +403,16 @@ function App() {
             onToggleNodeKilled={handleToggleNodeKilled}
             activeRoute={activeRoute}
             packetProgress={packetProgress}
+            onSelectPlanet={setInspectedPlanetId}
+          />
+          
+          <PlanetTowersMap
+            config={config}
+            inspectedPlanetId={inspectedPlanetId}
+            onSelectPlanet={setInspectedPlanetId}
+            activeRoute={activeRoute}
+            activeHop={activeHop}
+            isSimulating={isSimulating}
           />
           
           <LatencyMetrics activeRoute={activeRoute} />

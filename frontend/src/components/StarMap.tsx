@@ -12,6 +12,7 @@ interface StarMapProps {
   onToggleNodeKilled: (id: string) => void;
   activeRoute: RouteResult | null;
   packetProgress: { currentHopIndex: number; progress: number } | null;
+  onSelectPlanet?: (id: string) => void;
 }
 
 export const StarMap: React.FC<StarMapProps> = ({
@@ -24,6 +25,7 @@ export const StarMap: React.FC<StarMapProps> = ({
   onToggleNodeKilled,
   activeRoute,
   packetProgress,
+  onSelectPlanet,
 }) => {
   const [hoveredNode, setHoveredNode] = useState<Planet | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -151,6 +153,10 @@ export const StarMap: React.FC<StarMapProps> = ({
   }
 
   const handlePlanetClick = (planet: Planet) => {
+    if (onSelectPlanet) {
+      onSelectPlanet(planet.id);
+    }
+
     if (killedNodes.has(planet.id)) {
       onToggleNodeKilled(planet.id); // Toggle it back to active
       return;
