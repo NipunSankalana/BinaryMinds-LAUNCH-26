@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Outfit:wght@300;400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -39,9 +41,6 @@
 *, *::before, *::after {
   box-sizing: inherit;
 }
-
-/* Import Outfit and Orbitron fonts from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Outfit:wght@300;400;600;700&display=swap');
 
 body {
   margin: 0;

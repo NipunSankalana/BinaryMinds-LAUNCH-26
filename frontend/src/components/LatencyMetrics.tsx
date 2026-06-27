@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { RouteResult } from '../utils/math';
-import { Clock, ShieldAlert, BarChart, Info, HelpCircle } from 'lucide-react';
+import { Clock, ShieldAlert, BarChart, Info } from 'lucide-react';
 
 interface LatencyMetricsProps {
   activeRoute: RouteResult | null;

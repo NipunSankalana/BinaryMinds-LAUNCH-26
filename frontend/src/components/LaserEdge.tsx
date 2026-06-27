@@ -1,5 +1,6 @@
 import React from 'react';
-import { BaseEdge, EdgeProps, getSimpleBezierPath } from 'reactflow';
+import { BaseEdge, getSimpleBezierPath } from 'reactflow';
+import type { EdgeProps } from 'reactflow';
 
 export const LaserEdge: React.FC<EdgeProps> = ({
   sourceX,

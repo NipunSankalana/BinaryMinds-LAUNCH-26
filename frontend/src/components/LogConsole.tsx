@@ -26,9 +26,6 @@ export const LogConsole: React.FC<LogConsoleProps> = ({ logs, onClearLogs }) => 
 
   // Helper to colorize specific parts of log strings (e.g. Base numbers, binary arrays)
   const formatLogText = (text: string) => {
-    // Highlight "Base X"
-    let formatted: React.ReactNode[] = [text];
-    
     const baseRegex = /(Base \d+)/g;
     const binaryRegex = /(\[\d+(?:,\s*\d+)*\])/g;
 

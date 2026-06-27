@@ -1,18 +1,17 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
   Controls,
   useNodesState,
   useEdgesState,
-  Edge,
-  Node,
 } from 'reactflow';
+import type { Edge, Node } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { PlanetNode } from './PlanetNode';
 import { LaserEdge } from './LaserEdge';
-import type { Planet, UniverseConfig, RouteResult } from '../utils/math';
-import { Activity, ShieldAlert, Zap } from 'lucide-react';
+import type { UniverseConfig, RouteResult } from '../utils/math';
+import { ShieldAlert, Zap } from 'lucide-react';
 
 interface StarMapProps {
   config: UniverseConfig | null;
@@ -73,7 +72,6 @@ export const StarMap: React.FC<StarMapProps> = ({
         id: n.id,
         type: 'planet',
         position: pos,
-        dragHandle: '.drag-handle', // allow drag only via header/tag if needed (false = drag node directly)
         data: {
           id: n.id,
           name: n.id,
@@ -141,10 +139,21 @@ export const StarMap: React.FC<StarMapProps> = ({
     setEdges(flowEdges);
   }, [config, killedNodes, activeRoute, scale, maxVoidHop, setEdges]);
 
+  // Click handler to toggle killed status, or select origin/dest with modifier keys
+  const handleNodeClick = (event: React.MouseEvent, node: Node) => {
+    if (event.shiftKey) {
+      onSelectOrigin(node.id);
+    } else if (event.ctrlKey || event.metaKey) {
+      onSelectDest(node.id);
+    } else {
+      onToggleNodeKilled(node.id);
+    }
+  };
+
   if (!config) {
     return (
       <div className="glass-panel w-full h-[500px] flex flex-col items-center justify-center text-center p-8">
-        <Activity className="w-12 h-12 text-cyber-cyan animate-pulse mb-4" />
+        <Zap className="w-12 h-12 text-cyber-cyan animate-pulse mb-4" />
         <h3 className="text-xl text-slate-300 font-semibold tracking-wider font-display">Tactical Star Map Offline</h3>
         <p className="text-sm text-slate-500 max-w-sm mt-2 font-sans">
           Initialize the universe config to establish local telemetry links and map the star system.
@@ -195,6 +204,7 @@ export const StarMap: React.FC<StarMapProps> = ({
           onEdgesChange={onEdgesChange}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
+          onNodeClick={handleNodeClick}
           fitView
           fitViewOptions={{ padding: 0.15 }}
           zoomOnScroll={false}
@@ -214,9 +224,9 @@ export const StarMap: React.FC<StarMapProps> = ({
           <ShieldAlert className="w-3.5 h-3.5" /> GRID CONTROL MANUAL
         </h4>
         <ul className="text-[0.55rem] font-mono text-slate-400 list-disc list-inside space-y-0.5">
-          <li>Hover nodes to inspect atmosphere density (n).</li>
-          <li>Click a node on the Star Map sidebar to toggle ONLINE/OFFLINE.</li>
-          <li>Select endpoints using the dropdown panels on the right.</li>
+          <li>Click node: Toggle online/offline (Chaos).</li>
+          <li>Shift + Click: Set node as Origin.</li>
+          <li>Ctrl + Click: Set node as Destination.</li>
         </ul>
       </div>
     </div>
