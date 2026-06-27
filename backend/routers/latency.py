@@ -11,8 +11,11 @@ from pydantic import BaseModel
 
 from models.packet import LatencyBreakdown
 from services.parser import get_universe
-from services.dijkstra import find_route
-from services.latency import calc_total_hop, calc_void_distance
+from services.dijkstra import find_route_tower
+from services.latency import (
+    calc_void_distance,
+    calculate_crust_transit_time,
+)
 
 router = APIRouter(prefix="/latency", tags=["Latency"])
 
@@ -52,10 +55,10 @@ def calculate_latency(req: LatencyRequest) -> LatencyResponse:
     )
 
     try:
-        route = find_route(
+        route, total_latency_ms, entry_tower_map, exit_tower_map = find_route_tower(
             config=config,
-            origin=req.origin_id,
-            destination=req.destination_id,
+            origin_id=req.origin_id,
+            dest_id=req.destination_id,
             killed_nodes=killed_nodes,
             killed_edges=killed_edges,
         )
@@ -65,30 +68,72 @@ def calculate_latency(req: LatencyRequest) -> LatencyResponse:
         raise HTTPException(status_code=404, detail=str(exc))
 
     metadata = config.universe_metadata
-    node_map = {n.id: n for n in config.nodes}
+    c = metadata.speed_of_light_kms
+    ff = metadata.fiber_speed_fraction
+    td = metadata.tower_processing_delay_ms
+    scale = metadata.coordinate_scale_unit_km
 
+    node_map = {n.id: n for n in config.nodes}
     hops: List[HopLatency] = []
-    total_ms = 0.0
 
     for i in range(len(route) - 1):
-        src = node_map[route[i]]
-        dst = node_map[route[i + 1]]
-        breakdown, hop_ms = calc_total_hop(src, dst, metadata)
-        void_dist = calc_void_distance(src, dst, metadata.coordinate_scale_unit_km)
+        src_id = route[i]
+        dst_id = route[i + 1]
+        src_node = node_map[src_id]
+        dst_node = node_map[dst_id]
+
+        entry_tower_src = entry_tower_map[src_id]
+        exit_tower_src = exit_tower_map[src_id]
+        entry_tower_dst = entry_tower_map[dst_id]
+
+        transit_src = calculate_crust_transit_time(src_node, entry_tower_src, exit_tower_src, ff, c, td)
+
+        is_last_hop = (i == len(route) - 2)
+        if is_last_hop:
+            exit_tower_dst = exit_tower_map[dst_id]
+            transit_dst = calculate_crust_transit_time(dst_node, entry_tower_dst, exit_tower_dst, ff, c, td)
+        else:
+            transit_dst = {"fiber_time_ms": 0.0, "tower_delay_ms": 0.0, "total_transit_ms": 0.0}
+
+        void_dist = calc_void_distance(src_node, dst_node, scale)
+
+        fiber_exit_ms = transit_src["fiber_time_ms"]
+        atmosphere_exit_ms = (src_node.atmosphere_thickness_km * src_node.refraction_index / c) * 1000.0
+        void_ms = (void_dist / c) * 1000.0
+        atmosphere_entry_ms = (dst_node.atmosphere_thickness_km * dst_node.refraction_index / c) * 1000.0
+        tower_ms = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
+        fiber_entry_ms = transit_dst["fiber_time_ms"]
+
+        hop_latency_ms = (
+            fiber_exit_ms
+            + atmosphere_exit_ms
+            + void_ms
+            + atmosphere_entry_ms
+            + tower_ms
+            + fiber_entry_ms
+        )
+
+        breakdown = LatencyBreakdown(
+            fiber_exit_ms=round(fiber_exit_ms, 6),
+            atmosphere_exit_ms=round(atmosphere_exit_ms, 6),
+            void_ms=round(void_ms, 6),
+            atmosphere_entry_ms=round(atmosphere_entry_ms, 6),
+            tower_ms=round(tower_ms, 6),
+            fiber_entry_ms=round(fiber_entry_ms, 6),
+        )
 
         hops.append(
             HopLatency(
-                from_node=src.id,
-                to_node=dst.id,
+                from_node=src_id,
+                to_node=dst_id,
                 void_distance_km=round(void_dist, 3),
                 breakdown=breakdown,
-                total_hop_latency_ms=hop_ms,
+                total_hop_latency_ms=round(hop_latency_ms, 6),
             )
         )
-        total_ms += hop_ms
 
     return LatencyResponse(
         route=route,
         hops=hops,
-        total_latency_ms=round(total_ms, 6),
+        total_latency_ms=round(total_latency_ms, 6),
     )
