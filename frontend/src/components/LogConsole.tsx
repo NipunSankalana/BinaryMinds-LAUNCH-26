@@ -46,7 +46,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: {},
       icon: <Radar className="w-3 h-3" style={{ color: '#00f2fe' }} />,
       textStyle: { color: '#00f2fe', fontWeight: 700, letterSpacing: '0.08em', textShadow: '0 0 8px rgba(0,242,254,0.6)' },
-      rowStyle: { background: 'rgba(0,242,254,0.06)', borderLeft: '3px solid #00f2fe', borderRadius: '4px', padding: '6px 10px', marginBottom: '4px' },
+      rowStyle: { background: 'rgba(0,242,254,0.06)', borderLeft: '3px solid #00f2fe', borderRadius: '4px', padding: '8px 12px', marginBottom: '4px' },
       body: trimmed.replace(/===/g, '').trim(),
       isHeader: true,
       isSeparator: false,
@@ -57,7 +57,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
   if (trimmed === '') {
     return {
       badge: '', badgeStyle: {}, icon: null,
-      textStyle: {}, rowStyle: { height: '6px' },
+      textStyle: {}, rowStyle: { height: '10px' },
       body: '', isHeader: false, isSeparator: true,
     };
   }
@@ -70,7 +70,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(0,242,254,0.15)', color: '#00f2fe', border: '1px solid rgba(0,242,254,0.4)' },
       icon: <ArrowRight className="w-3 h-3" style={{ color: '#00f2fe' }} />,
       textStyle: { color: '#e2e8f0', fontWeight: 600 },
-      rowStyle: { background: 'rgba(0,242,254,0.04)', borderLeft: '3px solid #00f2fe', borderRadius: '4px', padding: '5px 10px', marginTop: '6px' },
+      rowStyle: { background: 'rgba(0,242,254,0.04)', borderLeft: '3px solid #00f2fe', borderRadius: '4px', padding: '7px 12px', marginTop: '8px' },
       body: hopMatch[2],
       isHeader: false,
       isSeparator: false,
@@ -85,7 +85,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(192,132,252,0.15)', color: '#c084fc', border: '1px solid rgba(192,132,252,0.4)' },
       icon: <Binary className="w-3 h-3" style={{ color: '#c084fc' }} />,
       textStyle: { color: '#c084fc' },
-      rowStyle: { borderLeft: '2px solid rgba(192,132,252,0.4)', paddingLeft: '10px', paddingTop: '2px', paddingBottom: '2px' },
+      rowStyle: { borderLeft: '2px solid rgba(192,132,252,0.4)', paddingLeft: '10px', paddingTop: '4px', paddingBottom: '4px' },
       body,
       isHeader: false,
       isSeparator: false,
@@ -100,7 +100,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(192,132,252,0.15)', color: '#c084fc', border: '1px solid rgba(192,132,252,0.4)' },
       icon: <Cpu className="w-3 h-3" style={{ color: '#c084fc' }} />,
       textStyle: { color: '#c084fc' },
-      rowStyle: { borderLeft: '2px solid rgba(192,132,252,0.4)', paddingLeft: '10px', paddingTop: '2px', paddingBottom: '2px' },
+      rowStyle: { borderLeft: '2px solid rgba(192,132,252,0.4)', paddingLeft: '10px', paddingTop: '4px', paddingBottom: '4px' },
       body,
       isHeader: false,
       isSeparator: false,
@@ -116,7 +116,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(0,242,254,0.10)', color: '#67e8f9', border: '1px solid rgba(103,232,249,0.35)' },
       icon: <Radio className="w-3 h-3" style={{ color: '#67e8f9' }} />,
       textStyle: { color: '#67e8f9' },
-      rowStyle: { borderLeft: '2px solid rgba(103,232,249,0.4)', paddingLeft: '10px', paddingTop: '2px', paddingBottom: '2px' },
+      rowStyle: { borderLeft: '2px solid rgba(103,232,249,0.4)', paddingLeft: '12px', paddingTop: '6px', paddingBottom: '6px' },
       body,
       isHeader: false,
       isSeparator: false,
@@ -131,7 +131,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(5,255,176,0.10)', color: '#05ffb0', border: '1px solid rgba(5,255,176,0.35)' },
       icon: <Globe className="w-3 h-3" style={{ color: '#05ffb0' }} />,
       textStyle: { color: '#a7f3d0' },
-      rowStyle: { borderLeft: '2px solid rgba(5,255,176,0.4)', paddingLeft: '10px', paddingTop: '2px', paddingBottom: '2px' },
+      rowStyle: { borderLeft: '2px solid rgba(5,255,176,0.4)', paddingLeft: '12px', paddingTop: '6px', paddingBottom: '6px' },
       body: planetMatch[2],
       isHeader: false,
       isSeparator: false,
@@ -145,7 +145,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)' },
       icon: <Zap className="w-3 h-3" style={{ color: '#f59e0b' }} />,
       textStyle: { color: '#f59e0b', fontWeight: 600 },
-      rowStyle: { background: 'rgba(245,158,11,0.04)', borderLeft: '3px solid rgba(245,158,11,0.7)', borderRadius: '4px', padding: '4px 10px', marginTop: '2px' },
+      rowStyle: { background: 'rgba(245,158,11,0.04)', borderLeft: '3px solid rgba(245,158,11,0.7)', borderRadius: '4px', padding: '7px 12px', marginTop: '4px' },
       body: trimmed.replace('✓', '').trim(),
       isHeader: false,
       isSeparator: false,
@@ -159,7 +159,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(5,255,176,0.15)', color: '#05ffb0', border: '1px solid rgba(5,255,176,0.5)' },
       icon: <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#05ffb0' }} />,
       textStyle: { color: '#05ffb0', fontWeight: 700, textShadow: '0 0 8px rgba(5,255,176,0.5)' },
-      rowStyle: { background: 'rgba(5,255,176,0.07)', border: '1px solid rgba(5,255,176,0.25)', borderRadius: '6px', padding: '7px 12px', marginTop: '6px' },
+      rowStyle: { background: 'rgba(5,255,176,0.07)', border: '1px solid rgba(5,255,176,0.25)', borderRadius: '6px', padding: '9px 14px', marginTop: '8px' },
       body: trimmed.replace('[SUCCESS]', '').trim(),
       isHeader: false,
       isSeparator: false,
@@ -173,7 +173,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(255,51,102,0.15)', color: '#ff3366', border: '1px solid rgba(255,51,102,0.5)' },
       icon: <AlertCircle className="w-3 h-3" style={{ color: '#ff3366' }} />,
       textStyle: { color: '#ff6b8a', fontWeight: 600 },
-      rowStyle: { background: 'rgba(255,51,102,0.06)', borderLeft: '3px solid #ff3366', borderRadius: '4px', padding: '5px 10px' },
+      rowStyle: { background: 'rgba(255,51,102,0.06)', borderLeft: '3px solid #ff3366', borderRadius: '4px', padding: '7px 12px' },
       body: trimmed.replace(/\[SIM ERROR\]|\[CHAOS ENG\]/g, '').trim(),
       isHeader: false,
       isSeparator: false,
@@ -188,7 +188,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: isKill ? 'rgba(255,51,102,0.12)' : 'rgba(5,255,176,0.10)', color: isKill ? '#ff3366' : '#05ffb0', border: `1px solid ${isKill ? 'rgba(255,51,102,0.4)' : 'rgba(5,255,176,0.4)'}` },
       icon: <AlertTriangle className="w-3 h-3" style={{ color: isKill ? '#ff3366' : '#05ffb0' }} />,
       textStyle: { color: isKill ? '#ff6b8a' : '#a7f3d0' },
-      rowStyle: { borderLeft: `2px solid ${isKill ? 'rgba(255,51,102,0.5)' : 'rgba(5,255,176,0.4)'}`, paddingLeft: '10px', paddingTop: '3px', paddingBottom: '3px' },
+      rowStyle: { borderLeft: `2px solid ${isKill ? 'rgba(255,51,102,0.5)' : 'rgba(5,255,176,0.4)'}`, paddingLeft: '12px', paddingTop: '6px', paddingBottom: '6px' },
       body: trimmed.replace('[CHAOS ENG]', '').trim(),
       isHeader: false,
       isSeparator: false,
@@ -202,7 +202,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
       badgeStyle: { background: 'rgba(255,255,255,0.06)', color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.15)' },
       icon: <Send className="w-3 h-3" style={{ color: '#cbd5e1' }} />,
       textStyle: { color: '#e2e8f0' },
-      rowStyle: { borderLeft: '2px solid rgba(255,255,255,0.2)', paddingLeft: '10px', paddingTop: '2px', paddingBottom: '2px' },
+      rowStyle: { borderLeft: '2px solid rgba(255,255,255,0.2)', paddingLeft: '12px', paddingTop: '6px', paddingBottom: '6px' },
       body: trimmed,
       isHeader: false,
       isSeparator: false,
@@ -225,7 +225,7 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
     badgeStyle: {},
     icon: null,
     textStyle: { color: fb.color },
-    rowStyle: { borderLeft: `2px solid ${fb.border}`, paddingLeft: '10px', paddingTop: '2px', paddingBottom: '2px' },
+    rowStyle: { borderLeft: `2px solid ${fb.border}`, paddingLeft: '12px', paddingTop: '4px', paddingBottom: '4px' },
     body: trimmed,
     isHeader: false,
     isSeparator: false,
@@ -314,7 +314,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
       <div
         ref={scrollContainerRef}
         className="terminal-layout flex-grow overflow-y-auto pr-1 h-[410px]"
-        style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}
+        style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}
       >
         {logs.length === 0 && (
           <div style={{ color: '#334155', fontFamily: 'var(--font-mono)', fontSize: '0.76rem', marginTop: 'auto', marginBottom: 'auto', textAlign: 'center', opacity: 0.6 }}>
