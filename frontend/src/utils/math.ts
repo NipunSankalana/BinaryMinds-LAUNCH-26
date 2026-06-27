@@ -222,7 +222,8 @@ export function findShortestPath(
   killedNodes: Set<string>,
   killedLinks: Set<string>,
   startTower: number = 0,
-  endTower: number = 0
+  endTower: number = 0,
+  payloadText: string = 'Hello world'
 ): RouteResult {
   const metadata = config.universe_metadata;
   const nodes = config.nodes;
@@ -381,14 +382,12 @@ export function findShortestPath(
       towerDelay
     );
     
-    // Dummy payloads for logging
+    // Payloads for logging
     // Original payload is ASCII text. 
     // In transit, it's encoded into the NEXT HOP's codex.
     // So payload_sent_codex is in nodeTo's codex.
     // Upon arrival, nodeTo decodes it back to ASCII.
-    // Let's mock a simple test payload conversion here for tracing
-    const mockPayload = "Hello world"; 
-    const encoded = encodeToBaseX(mockPayload, nodeTo.codex).join(' ');
+    const encoded = encodeToBaseX(payloadText, nodeTo.codex).join(' ');
     
     hop_logs.push({
       hop: i + 1,
@@ -403,7 +402,7 @@ export function findShortestPath(
       tower_delay_ms: crustT.towerDelayMs,
       hop_total_latency_ms: crustT.totalTransitMs + voidL,
       payload_sent_codex: encoded,
-      payload_received_ascii: mockPayload,
+      payload_received_ascii: payloadText,
     });
   }
   
