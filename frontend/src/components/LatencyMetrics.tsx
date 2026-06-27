@@ -4,32 +4,39 @@ import { Clock } from 'lucide-react';
 
 interface LatencyMetricsProps {
   activeRoute: RouteResult | null;
+  speedOfLight?: number; // km/s from universe metadata (default: 299792.458)
 }
 
-export const LatencyMetrics: React.FC<LatencyMetricsProps> = ({ activeRoute }) => {
+export const LatencyMetrics: React.FC<LatencyMetricsProps> = ({ activeRoute, speedOfLight = 299792.458 }) => {
   if (!activeRoute || activeRoute.error || activeRoute.hop_logs.length === 0) return null;
 
+  // Accumulate raw float components across all hops
   let totalFiberMs = 0;
   let totalTowerMs = 0;
-  let pureVoidMs = 0;
-  let atmosMs = 0;
+  let pureVoidMs   = 0;
+  let atmosMs      = 0;
 
   activeRoute.hop_logs.forEach((hop) => {
     totalFiberMs += hop.internal_transit_latency_ms;
     totalTowerMs += hop.tower_delay_ms;
-    
-    // Split Void travel time into pure vacuum time and atmosphere delay
-    const pureVac = (hop.void_distance_km / 300000) * 1000;
+
+    // Re-derive pure vacuum time from void_distance_km using the actual speed-of-light
+    // void_latency_ms = (void + atmos_exit + atmos_entry) / c * 1000
+    // pureVac = void_distance_km / c * 1000
+    const pureVac = (hop.void_distance_km / speedOfLight) * 1000;
     pureVoidMs += Math.max(0, pureVac);
-    atmosMs += Math.max(0, hop.void_latency_ms - pureVac);
+    // Remainder is atmospheric refraction on both sides
+    atmosMs    += Math.max(0, hop.void_latency_ms - pureVac);
   });
 
-  const grandTotal = activeRoute.total_latency_ms;
+  // Grand total is the exact sum of all hop sub-components —
+  // this guarantees the breakdown rows always add up to what's displayed in the header.
+  const grandTotal = totalFiberMs + totalTowerMs + pureVoidMs + atmosMs;
 
-  const pctVoid = grandTotal > 0 ? (pureVoidMs / grandTotal) * 100 : 0;
-  const pctAtmos = grandTotal > 0 ? (atmosMs / grandTotal) * 100 : 0;
-  const pctFiber = grandTotal > 0 ? (totalFiberMs / grandTotal) * 100 : 0;
-  const pctTower = grandTotal > 0 ? (totalTowerMs / grandTotal) * 100 : 0;
+  const pctVoid  = grandTotal > 0 ? (pureVoidMs   / grandTotal) * 100 : 0;
+  const pctAtmos = grandTotal > 0 ? (atmosMs       / grandTotal) * 100 : 0;
+  const pctFiber = grandTotal > 0 ? (totalFiberMs  / grandTotal) * 100 : 0;
+  const pctTower = grandTotal > 0 ? (totalTowerMs  / grandTotal) * 100 : 0;
 
   return (
     <div className="glass-panel p-4 border border-solid border-[#00f2fe]/10 flex flex-col gap-3 w-full select-none mt-4">
@@ -79,19 +86,19 @@ export const LatencyMetrics: React.FC<LatencyMetricsProps> = ({ activeRoute }) =
         <div className="grid grid-cols-4 gap-1.5 mt-1 text-[0.58rem] font-mono text-slate-400 text-center">
           <div className="flex items-center justify-center gap-1.5 bg-[#00f2fe]/5 py-1 rounded">
             <span className="w-2 h-2 bg-[#00f2fe] rounded-sm inline-block"></span>
-            <span>VOID: {pureVoidMs.toFixed(0)}ms</span>
+            <span>VOID: {pureVoidMs.toFixed(3)}ms</span>
           </div>
           <div className="flex items-center justify-center gap-1.5 bg-[#f59e0b]/5 py-1 rounded">
             <span className="w-2 h-2 bg-[#f59e0b] rounded-sm inline-block"></span>
-            <span>ATMOS: {atmosMs.toFixed(0)}ms</span>
+            <span>ATMOS: {atmosMs.toFixed(3)}ms</span>
           </div>
           <div className="flex items-center justify-center gap-1.5 bg-[#c084fc]/5 py-1 rounded">
             <span className="w-2 h-2 bg-[#c084fc] rounded-sm inline-block"></span>
-            <span>FIBER: {totalFiberMs.toFixed(0)}ms</span>
+            <span>FIBER: {totalFiberMs.toFixed(3)}ms</span>
           </div>
           <div className="flex items-center justify-center gap-1.5 bg-[#ff3366]/5 py-1 rounded">
             <span className="w-2 h-2 bg-[#ff3366] rounded-sm inline-block"></span>
-            <span>TOWER: {totalTowerMs.toFixed(0)}ms</span>
+            <span>TOWER: {totalTowerMs.toFixed(3)}ms</span>
           </div>
         </div>
       </div>

@@ -484,7 +484,10 @@ function App() {
             isSimulating={isSimulating}
           />
           
-          <LatencyMetrics activeRoute={activeRoute} />
+          <LatencyMetrics
+            activeRoute={activeRoute}
+            speedOfLight={config?.universe_metadata?.speed_of_light_kms ?? 299792.458}
+          />
         </div>
 
         {/* Right Sidebar: Transmission Console */}
