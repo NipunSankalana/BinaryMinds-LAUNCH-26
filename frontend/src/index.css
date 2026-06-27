@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* High-fidelity color system (Dark space theme) */
   --bg-deep: #05060b;
