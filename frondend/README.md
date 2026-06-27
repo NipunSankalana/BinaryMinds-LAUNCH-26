@@ -179,6 +179,7 @@ npm run dev
 | Animation | **Framer Motion** | Packet movement, state transitions |
 | HTTP Client | **Axios** | Backend API calls |
 | State | **Zustand** | Universe and simulation state |
+| Type safety | **TypeScript** | Static types |
 
 ---
 
