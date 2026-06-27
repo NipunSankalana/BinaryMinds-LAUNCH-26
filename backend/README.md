@@ -197,7 +197,7 @@ httpx
 ```
 BinaryMinds/
 ├── backend/
-├── frondend/
+├── frontend/
 └── universe-config.json   ← here
 ```
 

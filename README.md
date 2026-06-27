@@ -32,7 +32,7 @@ Project/
 │   ├── main.py              # Application entry point
 │   ├── services/            # Dijkstra, Latency calculation, & Codex engines
 │   └── tests/               # 100% pass-rate pytest test suite
-└── frondend/                # React (TypeScript) tactical star map visualization
+└── frontend/                # React (TypeScript) tactical star map visualization
     ├── src/
     │   ├── App.tsx          # Main layout and simulation runner
     │   ├── utils/api.ts     # Client fetch wrappers for backend REST endpoints

@@ -11,7 +11,7 @@ Connects to the FastAPI backend, renders the universe graph, animates packet mov
 ## 📁 Project Structure
 
 ```
-frondend/
+frontend/
 ├── index.html               # App entry point (Vite)
 ├── package.json             # Node dependencies and scripts
 ├── tsconfig.json            # TypeScript configuration
@@ -74,7 +74,7 @@ After installing, **restart Git Bash** so `node` and `npm` are on PATH.
 
 ```bash
 # Navigate into the frontend directory
-cd frondend
+cd frontend
 
 # Install all packages listed in package.json
 npm install
@@ -85,10 +85,10 @@ npm install
 ### 🔧 Environment Variables
 
 The frontend needs to know where the backend is running.  
-Create a `.env` file in the `frondend/` directory:
+Create a `.env` file in the `frontend/` directory:
 
 ```bash
-# Inside frondend/
+# Inside frontend/
 echo 'VITE_API_BASE_URL=http://localhost:8000' > .env
 ```
 
@@ -140,7 +140,7 @@ npm run preview
 
 ```bash
 # From the project root (BinaryMinds-LAUNCH-26/)
-cd frondend
+cd frontend
 npm install
 echo 'VITE_API_BASE_URL=http://localhost:8000' > .env
 npm run dev
@@ -160,7 +160,7 @@ source venv/Scripts/activate
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # Terminal 2 — frontend
-cd frondend
+cd frontend
 npm run dev
 ```
 
