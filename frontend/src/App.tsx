@@ -300,31 +300,62 @@ function App() {
           }
 
           const currentPlanetId = path[hopIdx];
-          const nextPlanetId = path[hopIdx + 1];
-          const currentPlanet = config.nodes.find(n => n.id === currentPlanetId)!;
-          const nextPlanet = config.nodes.find(n => n.id === nextPlanetId)!;
+          const nextPlanetId    = path[hopIdx + 1];
+          const currentPlanet   = config.nodes.find(n => n.id === currentPlanetId)!;
+          const nextPlanet      = config.nodes.find(n => n.id === nextPlanetId)!;
           const hopInfo = hopLogs[hopIdx];
-          const lb = hopInfo.latency_breakdown;
+          const lb      = hopInfo.latency_breakdown;
 
+          // Tower pair for this void hop
           const { towerA, towerB } = findClosestTowerPair(
             currentPlanet, nextPlanet,
             config.universe_metadata.coordinate_scale_unit_km || 100000
           );
 
-          const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
-          const binStream = serializeToBinaryStream(payloadText, nextPlanet.codex);
-          // Truncate for display: show first 40 bits + "..."
-          const binPreview = binStream.length > 40 ? binStream.slice(0, 40) + '...' : binStream;
+          // Ingress tower at the SOURCE planet:
+          // • hopIdx === 0 → origin planet, packet starts internally (no prior hop ingress)
+          // • hopIdx  > 0 → the ingress tower was towerB of the PREVIOUS hop
+          const prevHopInfo     = hopIdx > 0 ? hopLogs[hopIdx - 1] : null;
+          const prevTowerB      = prevHopInfo
+            ? findClosestTowerPair(
+                config.nodes.find(n => n.id === path[hopIdx - 1])!,
+                currentPlanet,
+                config.universe_metadata.coordinate_scale_unit_km || 100000
+              ).towerB
+            : null;
 
+          const srcIngressLabel = hopIdx === 0
+            ? 'Local Ingress'
+            : `Ingress Tower ${prevTowerB}`;
+
+          // Egress tower for the NEXT planet's relay arc:
+          // If nextPlanet is an intermediate relay, its egress toward hop[i+2] is towerA of hop[i+1]
+          const isNextFinalDest = hopIdx === path.length - 2;
+          const nextHopInfo     = !isNextFinalDest && hopIdx + 1 < hopLogs.length
+            ? hopLogs[hopIdx + 1]
+            : null;
+          const nextEgressTower = !isNextFinalDest && nextHopInfo
+            ? findClosestTowerPair(
+                nextPlanet,
+                config.nodes.find(n => n.id === path[hopIdx + 2])!,
+                config.universe_metadata.coordinate_scale_unit_km || 100000
+              ).towerA
+            : null;
+
+          const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
+          const binStream      = serializeToBinaryStream(payloadText, nextPlanet.codex);
+          const binPreview     = binStream.length > 40 ? binStream.slice(0, 40) + '...' : binStream;
+
+          // ── PRE-VOID: source planet egress ──────────────────────────────────
           appendLog(`\n[HOP ${hopIdx + 1}] ${currentPlanetId} → ${nextPlanetId}`, 'plain');
           appendLog(`  ▶ [ENC] Translate payload (ASCII → Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
           appendLog(`  ▶ [BIN] Serialized binary stream for laser TX: ${binPreview}`, 'info');
-          appendLog(`  ▶ [PLANET ${currentPlanetId}] Subsurface fiber: Center → Egress Tower ${towerA}  (+${lb.fiber_exit_ms.toFixed(2)} ms)`, 'plain');
+          appendLog(`  ▶ [PLANET ${currentPlanetId}] Subsurface fiber: ${srcIngressLabel} → Egress Tower ${towerA}  (+${lb.fiber_exit_ms.toFixed(2)} ms)`, 'plain');
           appendLog(`  ▶ [SPACE] Egress atmosphere at ${currentPlanetId}  (+${lb.atmosphere_exit_ms.toFixed(2)} ms)`, 'info');
           appendLog(`  ▶ [SPACE] Void laser transit: ${hopInfo.void_distance_km.toLocaleString()} km  (+${lb.void_ms.toFixed(2)} ms)`, 'info');
 
           let p = 0;
-          const duration = 1800;
+          const duration    = 1800;
           const intervalTime = 30;
           const steps = duration / intervalTime;
           const delta = 1 / steps;
@@ -335,13 +366,16 @@ function App() {
               clearInterval(progressInterval);
               setPacketProgress({ currentHopIndex: hopIdx, progress: 1 });
 
+              // ── POST-VOID: destination planet ingress ──────────────────────
               appendLog(`  ▶ [SPACE] Ingress atmosphere at ${nextPlanetId}  (+${lb.atmosphere_entry_ms.toFixed(2)} ms)`, 'info');
               appendLog(`  ▶ [PLANET ${nextPlanetId}] Ingress Tower ${towerB}: signal received & processed  (+${lb.tower_ms.toFixed(2)} ms)`, 'success');
 
-              if (hopIdx === path.length - 2) {
-                appendLog(`  ▶ [PLANET ${nextPlanetId}] Subsurface fiber: Tower ${towerB} → client endpoint  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
+              if (isNextFinalDest) {
+                // Final destination: fiber arc to ground station
+                appendLog(`  ▶ [PLANET ${nextPlanetId}] Subsurface fiber: Ingress Tower ${towerB} → client endpoint  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
               } else {
-                appendLog(`  ▶ [PLANET ${nextPlanetId}] Internal relay: Tower ${towerB} → next egress tower  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
+                // Intermediate relay: fiber arc across ring to egress toward next hop
+                appendLog(`  ▶ [PLANET ${nextPlanetId}] Ring arc (Tp): Ingress Tower ${towerB} → Egress Tower ${nextEgressTower}  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
               }
 
               appendLog(`  ▶ [DEC] Decoded Base ${nextPlanet.codex} → ASCII: "${payloadText}"`, 'success');
