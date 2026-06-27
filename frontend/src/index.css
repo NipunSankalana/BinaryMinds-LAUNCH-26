@@ -14,9 +14,9 @@
   --accent-purple: #c084fc;
   --accent-orange: #f59e0b;
 
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-display: 'Orbitron', var(--font-sans);
@@ -79,8 +79,8 @@ header.app-header {
 /* Layout Structure matching screenshot */
 .main-layout {
   display: grid;
-  grid-template-columns: 290px 1fr 340px;
-  gap: 16px;
+  grid-template-columns: 340px 1fr 400px;
+  gap: 20px;
   padding: 16px 16px 48px 16px;
   flex-grow: 1;
   min-height: calc(100vh - 54px);
@@ -171,17 +171,18 @@ header.app-header {
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .form-label {
   font-family: var(--font-display);
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--text-secondary);
+  margin-bottom: 2px;
 }
 
 .form-select, .form-input {
@@ -189,8 +190,8 @@ header.app-header {
   border: 1px solid rgba(0, 242, 254, 0.25);
   border-radius: 6px;
   color: var(--text-primary);
-  padding: 9px 12px;
-  font-size: 0.78rem;
+  padding: 11px 14px;
+  font-size: 0.84rem;
   font-family: var(--font-sans);
   transition: all 0.25s ease;
   width: 100%;
@@ -276,11 +277,11 @@ header.app-header {
   background: linear-gradient(180deg, rgba(2, 4, 8, 0.98) 0%, rgba(5, 7, 12, 0.98) 100%);
   border: 1px solid rgba(0, 242, 254, 0.2);
   border-radius: 6px;
-  padding: 14px;
+  padding: 16px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  color: #d1d9e1;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: #f8fafc;
   overflow-y: auto;
   flex-grow: 1;
   box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
