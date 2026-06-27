@@ -9,7 +9,7 @@ start "FastAPI Backend" cmd /k "cd backend && call .venv\Scripts\activate && uvi
 
 echo.
 echo [2/2] Launching Vite Frontend on http://localhost:5173...
-start "Vite Frontend" cmd /k "cd frontend && npm run dev"
+start "Vite Frontend" cmd /k "cd frontend && if not exist node_modules (npm install) && npm run dev"
 
 echo.
 echo =====================================================================
