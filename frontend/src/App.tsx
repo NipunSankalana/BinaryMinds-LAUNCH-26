@@ -174,15 +174,16 @@ function App() {
     }
 
     setIsSimulating(true);
+    // Reset logs to initial state
     setLogs([
       { text: `=== STARTING SIMULATION: ${selectedOrigin} TO ${selectedDest} ===`, type: 'info' },
-      { text: `Payload: "${payloadText}"`, type: 'plain' }
+      { text: `Payload: "${payloadText}"`, type: 'plain' },
     ]);
 
     api.sendPacket(selectedOrigin, selectedDest, payloadText)
       .then(packet => {
         if (packet.status === 'failed') {
-          addLog(`[SIM ERROR] ${packet.error || 'Delivery failed'}`, 'error');
+          setLogs(prev => [...prev, { text: `[SIM ERROR] ${packet.error || 'Delivery failed'}`, type: 'error' }]);
           setIsSimulating(false);
           return;
         }
@@ -190,19 +191,21 @@ function App() {
         const path = packet.route;
         const hopLogs = packet.hop_log;
         let hopIdx = 0;
-        
+
         setPacketProgress({ currentHopIndex: 0, progress: 0 });
+
+        const appendLog = (text: string, type: LogMessage['type']) => {
+          setLogs(prev => [...prev, { text, type }]);
+        };
 
         const animateHop = () => {
           if (hopIdx >= path.length - 1) {
-            // Simulation Completed successfully
             const destNode = config.nodes.find(n => n.id === selectedDest)!;
             const encodedArray = encodeToBaseX(payloadText, destNode.codex);
-            
-            addLog(`\n[HOP ${hopIdx + 1}] Destination reached: ${selectedDest} (Base ${destNode.codex})`, 'success');
-            addLog(`[DEC] Received payload in Base ${destNode.codex}: [${encodedArray.join(', ')}]`, 'purple');
-            addLog(`[DEC] Decoded successfully to ASCII: "${payloadText}"`, 'success');
-            addLog(`\n[SUCCESS] Packet safely delivered. Total latency: ${packet.total_latency_ms.toFixed(3)} ms.`, 'success');
+            appendLog(`\n[HOP ${hopIdx + 1}] Destination reached: ${selectedDest} (Base ${destNode.codex})`, 'success');
+            appendLog(`  ▶ [DEC] Received in Base ${destNode.codex}: [${encodedArray.join(', ')}]`, 'purple');
+            appendLog(`  ▶ [DEC] Decoded successfully to ASCII: "${payloadText}"`, 'success');
+            appendLog(`\n[SUCCESS] Packet safely delivered. Total latency: ${packet.total_latency_ms.toFixed(3)} ms.`, 'success');
             setIsSimulating(false);
             setPacketProgress(null);
             return;
@@ -213,28 +216,24 @@ function App() {
           const currentPlanet = config.nodes.find(n => n.id === currentPlanetId)!;
           const nextPlanet = config.nodes.find(n => n.id === nextPlanetId)!;
           const hopInfo = hopLogs[hopIdx];
-          
-          const { towerA, towerB } = findClosestTowerPair(currentPlanet, nextPlanet, config.universe_metadata.coordinate_scale_unit_km || 100000);
+          const lb = hopInfo.latency_breakdown;
 
-          addLog(`\n[HOP ${hopIdx + 1}] ${currentPlanetId} → ${nextPlanetId}`, 'plain');
-          
-          // Codex Dialect Conversion
+          const { towerA, towerB } = findClosestTowerPair(
+            currentPlanet, nextPlanet,
+            config.universe_metadata.coordinate_scale_unit_km || 100000
+          );
+
           const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
-          addLog(`  ▶ [ENC] Translate Payload (ASCII -> Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
-          
-          // Internal transit at source
-          addLog(`  ▶ [PLANET ${currentPlanetId}] Subsurface transit: Center to Egress Tower ${towerA} (+${hopInfo.latency_breakdown.fiber_exit_ms.toFixed(2)} ms)`, 'plain');
-          
-          // Atmosphere exit
-          addLog(`  ▶ [SPACE] Egress: Beaming laser through atmosphere at ${currentPlanetId} (+${hopInfo.latency_breakdown.atmosphere_exit_ms.toFixed(2)} ms)`, 'info');
-          
-          // Void travel
-          addLog(`  ▶ [SPACE] Void Transit: Beaming over vacuum (${hopInfo.void_distance_km.toLocaleString()} km) (+${hopInfo.latency_breakdown.void_ms.toFixed(2)} ms)`, 'info');
 
-          // Step 2: Animate progress
+          appendLog(`\n[HOP ${hopIdx + 1}] ${currentPlanetId} → ${nextPlanetId}`, 'plain');
+          appendLog(`  ▶ [ENC] Translate payload (ASCII → Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
+          appendLog(`  ▶ [PLANET ${currentPlanetId}] Subsurface fiber: Center → Egress Tower ${towerA}  (+${lb.fiber_exit_ms.toFixed(2)} ms)`, 'plain');
+          appendLog(`  ▶ [SPACE] Egress atmosphere at ${currentPlanetId}  (+${lb.atmosphere_exit_ms.toFixed(2)} ms)`, 'info');
+          appendLog(`  ▶ [SPACE] Void laser transit: ${hopInfo.void_distance_km.toLocaleString()} km  (+${lb.void_ms.toFixed(2)} ms)`, 'info');
+
           let p = 0;
-          const duration = 1800; // ms
-          const intervalTime = 30; // ms
+          const duration = 1800;
+          const intervalTime = 30;
           const steps = duration / intervalTime;
           const delta = 1 / steps;
 
@@ -243,23 +242,19 @@ function App() {
             if (p >= 1) {
               clearInterval(progressInterval);
               setPacketProgress({ currentHopIndex: hopIdx, progress: 1 });
-              
-              // Hop finished
-              addLog(`  ▶ [SPACE] Ingress: Entering atmosphere at ${nextPlanetId} (+${hopInfo.latency_breakdown.atmosphere_entry_ms.toFixed(2)} ms)`, 'info');
-              addLog(`  ▶ [PLANET ${nextPlanetId}] Ingress Tower ${towerB}: Received signal & processed (+${hopInfo.latency_breakdown.tower_ms.toFixed(2)} ms)`, 'success');
-              
+
+              appendLog(`  ▶ [SPACE] Ingress atmosphere at ${nextPlanetId}  (+${lb.atmosphere_entry_ms.toFixed(2)} ms)`, 'info');
+              appendLog(`  ▶ [PLANET ${nextPlanetId}] Ingress Tower ${towerB}: signal received & processed  (+${lb.tower_ms.toFixed(2)} ms)`, 'success');
+
               if (hopIdx === path.length - 2) {
-                // Final Arrive
-                addLog(`  ▶ [PLANET ${nextPlanetId}] Subsurface transit: Ingress Tower ${towerB} to target client (+${hopInfo.latency_breakdown.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
+                appendLog(`  ▶ [PLANET ${nextPlanetId}] Subsurface fiber: Tower ${towerB} → client endpoint  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
               } else {
-                // Relay transit
-                addLog(`  ▶ [PLANET ${nextPlanetId}] Internal routing: Ingress Tower ${towerB} to Egress Tower (+${hopInfo.latency_breakdown.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
+                appendLog(`  ▶ [PLANET ${nextPlanetId}] Internal relay: Tower ${towerB} → next egress tower  (+${lb.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
               }
 
-              addLog(`  ▶ [DEC] Decoded Base ${nextPlanet.codex} back to ASCII: "${payloadText}"`, 'success');
-              addLog(`  ✓ Hop total latency: ${hopInfo.total_hop_latency_ms.toFixed(2)} ms`, 'warning');
+              appendLog(`  ▶ [DEC] Decoded Base ${nextPlanet.codex} → ASCII: "${payloadText}"`, 'success');
+              appendLog(`  ✓ Hop latency total: ${hopInfo.total_hop_latency_ms.toFixed(2)} ms`, 'warning');
 
-              // Next hop
               hopIdx++;
               if (hopIdx < path.length - 1) {
                 setPacketProgress({ currentHopIndex: hopIdx, progress: 0 });
@@ -274,7 +269,7 @@ function App() {
         setTimeout(animateHop, 300);
       })
       .catch(err => {
-        addLog(`[SIM ERROR] ${err.message}`, 'error');
+        setLogs(prev => [...prev, { text: `[SIM ERROR] ${err.message}`, type: 'error' }]);
         setIsSimulating(false);
       });
   };

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { RouteResult, UniverseConfig } from '../utils/math';
 import { Terminal, ShieldCheck, AlertCircle, ArrowDown, ChevronRight, ChevronDown, Activity } from 'lucide-react';
 
@@ -28,20 +28,28 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
   selectedOrigin,
   selectedDest,
 }) => {
-  const [showRawSchema, setShowRawSchema] = useState(false);
+  const [showRawSchema, setShowRawSchema] = useState<boolean>(false);
+  const consoleEndRef = useRef<HTMLDivElement>(null);
 
-  // Status mapping
-  let statusText = 'IDLE';
+  // Auto-scroll to the bottom of the log console when new logs arrive
+  useEffect(() => {
+    if (consoleEndRef.current) {
+      consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs]);
+
+  // Determine console header status based on log state
+  let statusText = 'READY';
   let statusColor = 'text-slate-400';
-  let statusIcon = <Terminal className="w-3.5 h-3.5" />;
+  let statusIcon = <Activity className="w-3.5 h-3.5 text-slate-400" />;
 
   if (isSimulating) {
-    statusText = 'IN TRANSIT';
-    statusColor = 'text-[#f59e0b]';
-    statusIcon = <Activity className="w-3.5 h-3.5 animate-pulse text-[#f59e0b]" />;
-  } else if (activeRoute) {
-    if (activeRoute.error) {
-      statusText = 'FAILED';
+    statusText = 'TRANSMITTING';
+    statusColor = 'text-[#00f2fe] animate-pulse';
+    statusIcon = <Activity className="w-3.5 h-3.5 text-[#00f2fe] animate-spin" />;
+  } else if (logs.length > 0) {
+    if (logs.some(l => l.type === 'error')) {
+      statusText = 'ERROR';
       statusColor = 'text-[#ff3366]';
       statusIcon = <AlertCircle className="w-3.5 h-3.5 text-[#ff3366]" />;
     } else if (logs.some(l => l.text.includes('delivered') || l.text.includes('SUCCESS'))) {
@@ -93,111 +101,23 @@ export const LogConsole: React.FC<LogConsoleProps> = ({
 
       {/* Terminal log output */}
       <div className="terminal-layout flex-grow overflow-y-auto pr-1 flex flex-col gap-2 h-[410px]">
-        {/* Step 1: Calculation details */}
-        {activeRoute && (
-          <div className="text-[0.68rem] text-slate-500 font-mono flex flex-col gap-0.5">
-            <div>&gt; INITIALIZING ROUTE CALCULATION...</div>
-            <div>&gt; ORIGIN: {selectedOrigin}</div>
-            <div>&gt; DESTINATION: {selectedDest}</div>
-            <div>&gt; COMPUTING SHORT PATH VIA DIJKSTRA... DONE</div>
-            {activeRoute.error ? (
-              <div className="text-[#ff3366] font-semibold">&gt; ROUTING ERROR: {activeRoute.error}</div>
-            ) : (
-              <div>&gt; COMMENCING PACKET TRANSMISSION</div>
-            )}
-          </div>
-        )}
-
-        {/* Step 2: Hop log cards */}
-        {visibleHops.map((hop, idx) => {
-          const isCurrentHop = packetProgress && idx === packetProgress.currentHopIndex;
-          const isFinalHop = hop.to_planet === selectedDest;
-          const destCodex = getCodexForPlanet(hop.to_planet, config);
-          const srcCodex = getCodexForPlanet(hop.from_planet, config);
-
-          return (
-            <React.Fragment key={hop.hop}>
-              <div className="terminal-hop-box">
-                {/* Header */}
-                <div className="terminal-hop-header">
-                  <span>HOP {hop.hop}: {hop.to_planet}</span>
-                  <span className="text-xs text-[#00f2fe]">
-                    {isCurrentHop ? 'BEAMING...' : `Lat: +${hop.hop_total_latency_ms.toFixed(2)}ms`}
-                  </span>
-                </div>
-                {/* Body */}
-                <div className="terminal-hop-body font-mono text-[0.65rem] text-slate-400">
-                  <div className="text-[#05ffb0] font-semibold">
-                    {isFinalHop ? (
-                      `ACTION[Arrive: decode Base-${destCodex} -> ASCII -> deliver payload]`
-                    ) : (
-                      `ACTION[Transit: decode Base-${srcCodex} -> ASCII -> re-encode Base-${destCodex} -> void -> Planet ${hop.to_planet}]`
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }} className="font-mono select-none">
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.62rem', fontWeight: 600 }}>CODEX BASE</span>
-                    <span style={{ color: 'var(--accent-cyan)', fontSize: '0.62rem', fontWeight: 600 }}>Base-{destCodex}</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-1.5 mt-1">
-                    <div className="terminal-payload-box">
-                      <div className="text-[0.58rem] text-[#c084fc] font-semibold uppercase tracking-wider mb-0.5">
-                        PAYLOAD (BASE-{destCodex})
-                      </div>
-                      <div className="text-[#e2e8f0] tracking-wider word-break-all">
-                        {hop.payload_sent_codex}
-                      </div>
-                    </div>
-
-                    <div className="terminal-payload-box">
-                      <div className="text-[0.58rem] text-[#00f2fe] font-semibold uppercase tracking-wider mb-0.5">
-                        DECODED (ASCII)
-                      </div>
-                      <div className="text-[#05ffb0] tracking-wider">
-                        {hop.payload_received_ascii}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+        {/* Render real-time console log messages */}
+        <div className="flex flex-col gap-2 font-mono text-[0.78rem] select-text">
+          {logs.map((log, idx) => {
+            let colorClass = 'text-slate-300';
+            if (log.type === 'info') colorClass = 'text-[#00f2fe]';
+            if (log.type === 'success') colorClass = 'text-[#05ffb0]';
+            if (log.type === 'warning') colorClass = 'text-[#f59e0b]';
+            if (log.type === 'error') colorClass = 'text-[#ff3366] font-bold';
+            if (log.type === 'purple') colorClass = 'text-[#c084fc]';
+            return (
+              <div key={idx} className={`${colorClass} whitespace-pre-wrap leading-relaxed`}>
+                {log.text}
               </div>
-
-              {/* Show Arrow if not the last hop in route */}
-              {idx < visibleHops.length - 1 && (
-                <div className="flex justify-center text-slate-700 py-1">
-                  <ArrowDown className="w-4 h-4 animate-bounce" />
-                </div>
-              )}
-            </React.Fragment>
-          );
-        })}
-
-        {/* Step 3: Destination reached status */}
-        {!isSimulating && activeRoute && !activeRoute.error && logs.some(l => l.text.includes('delivered')) && (
-          <div className="mt-2 border-t border-solid border-slate-900 pt-3 flex flex-col gap-2">
-            <div className="text-[#05ffb0] uppercase font-bold font-display text-[0.72rem] tracking-wider">
-              &gt; DESTINATION REACHED
-            </div>
-            
-            <div className="bg-black/60 border border-solid border-slate-900 p-3 rounded text-[0.7rem] text-slate-400 font-mono flex flex-col gap-1.5">
-              <div className="flex justify-between">
-                <span>TOTAL LATENCY:</span>
-                <span className="text-[#05ffb0] font-bold">{activeRoute.total_latency_ms.toFixed(3)}ms</span>
-              </div>
-              <div className="flex justify-between">
-                <span>HOPS REQUIRED:</span>
-                <span className="text-white font-bold">{activeRoute.path.length - 1}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Fallback / idle */}
-        {logs.length === 0 && (
-          <div className="text-slate-600 italic select-none py-12 text-center text-xs">
-            SYSTEM IDLE. Awaiting transmission commands...
-          </div>
-        )}
+            );
+          })}
+          <div ref={consoleEndRef} />
+        </div>
       </div>
 
       {/* Raw Packet Schema button at bottom */}
