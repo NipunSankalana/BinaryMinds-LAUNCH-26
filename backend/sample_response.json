@@ -1,0 +1,106 @@
+{
+  "demo_normal": {
+    "origin_id": "Aegis",
+    "destination_id": "Caelum",
+    "current_id": "Caelum",
+    "payload": "HELLO",
+    "hop_log": [
+      {
+        "from_node": "Aegis",
+        "to_node": "Dawn",
+        "void_distance_km": 35347318.059,
+        "payload_encoded": "200 153 204 204 211",
+        "payload_decoded": "HELLO",
+        "source_codex": 8,
+        "dest_codex": 6,
+        "latency_breakdown": {
+          "fiber_exit_ms": 31.696517,
+          "atmosphere_exit_ms": 0.40012,
+          "void_ms": 117824.393531,
+          "atmosphere_entry_ms": 0.1011,
+          "tower_ms": 7.0,
+          "fiber_entry_ms": 7.462687
+        },
+        "total_hop_latency_ms": 117871.053955
+      },
+      {
+        "from_node": "Dawn",
+        "to_node": "Caelum",
+        "void_distance_km": 33480757.662,
+        "payload_encoded": "52 4D 56 56 59",
+        "payload_decoded": "HELLO",
+        "source_codex": 6,
+        "dest_codex": 14,
+        "latency_breakdown": {
+          "fiber_exit_ms": 7.462687,
+          "atmosphere_exit_ms": 0.1011,
+          "void_ms": 111602.525542,
+          "atmosphere_entry_ms": 2.201667,
+          "tower_ms": 7.0,
+          "fiber_entry_ms": 289.711443
+        },
+        "total_hop_latency_ms": 111909.002438
+      }
+    ],
+    "total_latency_ms": 229780.056393,
+    "route": [
+      "Aegis",
+      "Dawn",
+      "Caelum"
+    ],
+    "status": "delivered",
+    "error": null
+  },
+  "demo_chaos_kill_Dawn": {
+    "origin_id": "Aegis",
+    "destination_id": "Caelum",
+    "current_id": "Caelum",
+    "payload": "HELLO",
+    "hop_log": [
+      {
+        "from_node": "Aegis",
+        "to_node": "Elysium",
+        "void_distance_km": 46084930.286,
+        "payload_encoded": "72 69 76 76 79",
+        "payload_decoded": "HELLO",
+        "source_codex": 8,
+        "dest_codex": 10,
+        "latency_breakdown": {
+          "fiber_exit_ms": 31.696517,
+          "atmosphere_exit_ms": 0.40012,
+          "void_ms": 153616.434288,
+          "atmosphere_entry_ms": 0.9875,
+          "tower_ms": 7.0,
+          "fiber_entry_ms": 30.104478
+        },
+        "total_hop_latency_ms": 153686.622903
+      },
+      {
+        "from_node": "Elysium",
+        "to_node": "Caelum",
+        "void_distance_km": 38013832.529,
+        "payload_encoded": "52 4D 56 56 59",
+        "payload_decoded": "HELLO",
+        "source_codex": 10,
+        "dest_codex": 14,
+        "latency_breakdown": {
+          "fiber_exit_ms": 30.104478,
+          "atmosphere_exit_ms": 0.9875,
+          "void_ms": 126712.775098,
+          "atmosphere_entry_ms": 2.201667,
+          "tower_ms": 7.0,
+          "fiber_entry_ms": 289.711443
+        },
+        "total_hop_latency_ms": 127042.780185
+      }
+    ],
+    "total_latency_ms": 280729.403088,
+    "route": [
+      "Aegis",
+      "Elysium",
+      "Caelum"
+    ],
+    "status": "rerouted",
+    "error": null
+  }
+}
