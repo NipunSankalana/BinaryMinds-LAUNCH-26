@@ -80,24 +80,32 @@ function App() {
     }
   }, [config, selectedOrigin, selectedDest, killedNodes, killedLinks]);
 
-  // Load universe config on startup
+  // Load universe config on startup — always reset backend state first
   useEffect(() => {
     setLogs([
       { text: "=== RELIC RING CORE PROTOCOL CONSOLE ===", type: "info" },
       { text: "Connecting to tactical star grid backend...", type: "plain" }
     ]);
-    api.initializeUniverse()
-      .then(res => {
-        setConfig({
-          universe_metadata: res.metadata,
-          nodes: res.nodes
+    // Reset any stale killed-node state from a previous session
+    api.resetSimulation().catch(() => {/* ignore if already clean */}).finally(() => {
+      api.initializeUniverse()
+        .then(res => {
+          setConfig({
+            universe_metadata: res.metadata,
+            nodes: res.nodes
+          });
+          setKilledNodes(new Set());
+          setKilledLinks(new Set());
+          setLogs(prev => [
+            ...prev,
+            { text: "System initialized. Core Zeta-26 configuration loaded from backend.", type: "success" },
+            { text: "Ready to route laser packets across star system legacy grid.", type: "plain" }
+          ]);
+        })
+        .catch(err => {
+          setLogs(prev => [...prev, { text: `❌ FAILED TO INITIALIZE UNIVERSE: ${err.message}`, type: "error" }]);
         });
-        addLog("System initialized. Core Zeta-26 configuration loaded from backend.", "success");
-        addLog("Ready to route laser packets across star system legacy grid.", "plain");
-      })
-      .catch(err => {
-        addLog(`❌ FAILED TO INITIALIZE UNIVERSE: ${err.message}`, "error");
-      });
+    });
   }, []);
 
   const addLog = (text: string, type: LogMessage['type'] = 'plain') => {
