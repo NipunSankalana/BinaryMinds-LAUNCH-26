@@ -164,7 +164,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 <button
                   onClick={handleToggleChaos}
                   disabled={!selectedChaosNode || isSimulating}
-                  className="bg-rose-600 hover:bg-rose-500 text-white rounded p-2 transition-colors flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="btn-danger p-2 shrink-0"
                 >
                   <Skull className="w-4 h-4" />
                 </button>
@@ -189,7 +189,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               <button
                 onClick={onRepairAll}
                 disabled={killedNodes.size === 0 || isSimulating}
-                className="text-[0.62rem] font-display font-semibold border border-solid border-slate-700 hover:border-slate-500 rounded px-2.5 py-1 text-slate-400 hover:text-slate-300 transition-all uppercase flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="btn-secondary py-1 px-2.5"
               >
                 <RefreshCw className="w-2.5 h-2.5" /> REPAIR ALL
               </button>
@@ -211,7 +211,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className="flex gap-2">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="text-[0.62rem] font-display font-semibold border border-solid border-slate-700 hover:border-slate-500 rounded flex-1 py-2 text-slate-400 hover:text-slate-300 transition-all flex items-center justify-center gap-1.5"
+            className="btn-secondary flex-1 py-2"
             disabled={isSimulating}
           >
             <Upload className="w-3.5 h-3.5" /> UPLOAD JSON
@@ -225,7 +225,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           />
           <button
             onClick={onLoadDefaultUniverse}
-            className="text-[0.62rem] font-display font-semibold border border-solid border-slate-700 hover:border-slate-500 rounded flex-1 py-2 text-slate-400 hover:text-slate-300 transition-all flex items-center justify-center gap-1.5"
+            className="btn-secondary flex-1 py-2"
             disabled={isSimulating}
           >
             <Cpu className="w-3.5 h-3.5" /> DEFAULT CORE
