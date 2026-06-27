@@ -36,6 +36,7 @@ export interface HopLogEntry {
   hop_total_latency_ms: number;
   payload_sent_codex: string;
   payload_received_ascii: string;
+  binary_stream?: string;  // flat bit-stream for laser transmission
 }
 
 export interface RouteResult {
@@ -184,6 +185,26 @@ export function encodeToBaseX(text: string, base: number): string[] {
     const code = char.charCodeAt(0);
     return code.toString(base).toUpperCase();
   });
+}
+
+/**
+ * Serialize an ASCII payload into a flat binary bit-stream for laser void transmission.
+ *
+ * Bit-packing standard (mirrors backend translator.py):
+ *   Each character's ASCII ordinal is packed into a fixed-width binary field.
+ *   Width = max(8, ceil(log2(codexBase))) bits per symbol.
+ *   Symbols are concatenated with no delimiter — the receiver knows the frame size.
+ *
+ * @param payload    - ASCII text to serialize
+ * @param codexBase  - destination planet codex (determines bit-width)
+ * @returns flat binary string e.g. "0100100001100101..."
+ */
+export function serializeToBinaryStream(payload: string, codexBase: number): string {
+  if (!payload) return '';
+  const bitsPerSymbol = Math.max(8, codexBase > 2 ? Math.ceil(Math.log2(codexBase)) : 8);
+  return Array.from(payload)
+    .map(ch => ch.charCodeAt(0).toString(2).padStart(bitsPerSymbol, '0'))
+    .join('');
 }
 
 /**

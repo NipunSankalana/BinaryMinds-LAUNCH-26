@@ -6,7 +6,8 @@ import { LatencyMetrics } from './components/LatencyMetrics';
 import { PlanetTowersMap } from './components/PlanetTowersMap';
 import {
   findClosestTowerPair,
-  encodeToBaseX
+  encodeToBaseX,
+  serializeToBinaryStream
 } from './utils/math';
 import type { UniverseConfig, RouteResult } from './utils/math';
 import { api } from './utils/api';
@@ -96,6 +97,7 @@ function App() {
           const fromNode = config.nodes.find(n => n.id === hop.from_node)!;
           const toNode = config.nodes.find(n => n.id === hop.to_node)!;
           const { towerA, towerB } = findClosestTowerPair(fromNode, toNode, config.universe_metadata.coordinate_scale_unit_km || 100000);
+          const binStream = serializeToBinaryStream(payloadText, toNode.codex);
           return {
             hop: idx + 1,
             from_planet: hop.from_node,
@@ -110,6 +112,7 @@ function App() {
             hop_total_latency_ms: hop.total_hop_latency_ms,
             payload_sent_codex: "",
             payload_received_ascii: "",
+            binary_stream: binStream,
           };
         });
 
@@ -309,9 +312,13 @@ function App() {
           );
 
           const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
+          const binStream = serializeToBinaryStream(payloadText, nextPlanet.codex);
+          // Truncate for display: show first 40 bits + "..."
+          const binPreview = binStream.length > 40 ? binStream.slice(0, 40) + '...' : binStream;
 
           appendLog(`\n[HOP ${hopIdx + 1}] ${currentPlanetId} → ${nextPlanetId}`, 'plain');
           appendLog(`  ▶ [ENC] Translate payload (ASCII → Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
+          appendLog(`  ▶ [BIN] Serialized binary stream for laser TX: ${binPreview}`, 'info');
           appendLog(`  ▶ [PLANET ${currentPlanetId}] Subsurface fiber: Center → Egress Tower ${towerA}  (+${lb.fiber_exit_ms.toFixed(2)} ms)`, 'plain');
           appendLog(`  ▶ [SPACE] Egress atmosphere at ${currentPlanetId}  (+${lb.atmosphere_exit_ms.toFixed(2)} ms)`, 'info');
           appendLog(`  ▶ [SPACE] Void laser transit: ${hopInfo.void_distance_km.toLocaleString()} km  (+${lb.void_ms.toFixed(2)} ms)`, 'info');

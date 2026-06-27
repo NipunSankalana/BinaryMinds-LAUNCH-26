@@ -92,6 +92,21 @@ function parseLine(text: string, type: LogMessage['type']): ParsedLine {
     };
   }
 
+  // ── [BIN] — serialized binary laser stream
+  if (trimmed.includes('[BIN]')) {
+    const body = trimmed.replace(/▶\s*\[BIN\]/, '').trim();
+    return {
+      badge: 'BIN',
+      badgeStyle: { background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.4)' },
+      icon: <Zap className="w-3 h-3" style={{ color: '#f59e0b' }} />,
+      textStyle: { color: '#fbbf24', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', letterSpacing: '0.04em' },
+      rowStyle: { background: 'rgba(245,158,11,0.04)', borderLeft: '2px solid rgba(245,158,11,0.5)', paddingLeft: '10px', paddingTop: '5px', paddingBottom: '5px', borderRadius: '3px' },
+      body,
+      isHeader: false,
+      isSeparator: false,
+    };
+  }
+
   // ── [DEC] — decoding
   if (trimmed.includes('[DEC]')) {
     const body = trimmed.replace(/▶?\s*\[DEC\]/, '').trim();

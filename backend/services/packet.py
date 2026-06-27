@@ -94,8 +94,8 @@ def simulate_delivery(
         src_node = _node_by_id(config, src_id)
         dst_node = _node_by_id(config, dst_id)
 
-        # Codex translation
-        encoded, decoded = translate_hop(
+        # Codex translation + binary stream serialization
+        encoded, decoded, binary_stream = translate_hop(
             payload=current_payload,
             source_codex=src_node.codex,
             dest_codex=dst_node.codex,
@@ -175,6 +175,7 @@ def simulate_delivery(
             void_distance_km=round(void_dist, 3),
             payload_encoded=encoded,
             payload_decoded=decoded,
+            binary_stream=binary_stream,
             source_codex=src_node.codex,
             dest_codex=dst_node.codex,
             latency_breakdown=breakdown,

@@ -25,6 +25,7 @@ class HopEntry(BaseModel):
     void_distance_km: float
     payload_encoded: str       # payload encoded in destination planet's codex (before hop)
     payload_decoded: str       # payload decoded back to ASCII at destination
+    binary_stream: str         # flat binary bit-stream serialized for laser void transmission
     source_codex: int          # base used by source planet
     dest_codex: int            # base used by destination planet
     latency_breakdown: LatencyBreakdown
