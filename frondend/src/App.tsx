@@ -19,7 +19,7 @@ const DEFAULT_UNIVERSE: UniverseConfig = {
   universe_metadata: {
     speed_of_light_kms: 300000.0,
     tower_processing_delay_ms: 7.0,
-    max_void_hop_distance_km: 1100000.0, // Forced multi-hop for Aegis -> Dawn -> Caelum
+    max_void_hop_distance_km: 1100000.0, // Force multi-hop for Aegis -> Dawn -> Caelum
     coordinate_scale_unit_km: 100000.0,
     fiber_speed_fraction: 0.67
   },
@@ -27,38 +27,48 @@ const DEFAULT_UNIVERSE: UniverseConfig = {
     {
       id: "Aegis",
       codex: 8,
-      x: 0.0,
-      y: 10.0,
+      x: -8.0,
+      y: 3.0,
       radius_km: 6000.0,
       active_towers: 8,
       atmosphere_thickness_km: 200.0,
       refraction_index: 1.2
     },
     {
-      id: "Dawn",
-      codex: 5,
-      x: 8.0,
-      y: 4.0,
-      radius_km: 5000.0,
-      active_towers: 6,
-      atmosphere_thickness_km: 150.0,
-      refraction_index: 1.1
-    },
-    {
       id: "Boreas",
-      codex: 10,
-      x: -6.0,
-      y: 4.0,
+      codex: 5,
+      x: -4.0,
+      y: 0.0,
       radius_km: 5500.0,
       active_towers: 6,
       atmosphere_thickness_km: 180.0,
       refraction_index: 1.15
     },
     {
+      id: "Dawn",
+      codex: 6,
+      x: 0.0,
+      y: 2.0,
+      radius_km: 5000.0,
+      active_towers: 6,
+      atmosphere_thickness_km: 150.0,
+      refraction_index: 1.1
+    },
+    {
+      id: "Fenix",
+      codex: 16,
+      x: 4.0,
+      y: 6.0,
+      radius_km: 5800.0,
+      active_towers: 8,
+      atmosphere_thickness_km: 190.0,
+      refraction_index: 1.18
+    },
+    {
       id: "Elysium",
       codex: 12,
-      x: -3.0,
-      y: -2.0,
+      x: -1.0,
+      y: -7.0,
       radius_km: 6200.0,
       active_towers: 8,
       atmosphere_thickness_km: 220.0,
@@ -68,19 +78,19 @@ const DEFAULT_UNIVERSE: UniverseConfig = {
       id: "Caelum",
       codex: 14,
       x: 8.0,
-      y: -2.0,
-      radius_km: 5800.0,
+      y: -3.0,
+      radius_km: 5700.0,
       active_towers: 8,
-      atmosphere_thickness_km: 190.0,
-      refraction_index: 1.18
+      atmosphere_thickness_km: 170.0,
+      refraction_index: 1.12
     }
   ]
 };
 
 function App() {
   const [config, setConfig] = useState<UniverseConfig | null>(DEFAULT_UNIVERSE);
-  const [selectedOrigin, setSelectedOrigin] = useState<string | null>('Aegis');
-  const [selectedDest, setSelectedDest] = useState<string | null>('Caelum');
+  const [selectedOrigin, setSelectedOrigin] = useState<string | null>('Boreas');
+  const [selectedDest, setSelectedDest] = useState<string | null>('Elysium');
   const [startTower, setStartTower] = useState<number>(0);
   const [endTower, setEndTower] = useState<number>(0);
   const [payloadText, setPayloadText] = useState<string>('Hello world');
@@ -93,7 +103,7 @@ function App() {
   const [packetProgress, setPacketProgress] = useState<{ currentHopIndex: number; progress: number } | null>(null);
   const [logs, setLogs] = useState<LogMessage[]>([]);
 
-  // Auto-calculate route on configuration, endpoints or chaos changes
+  // Auto-calculate route on config, selection, or chaos updates
   useEffect(() => {
     if (config && selectedOrigin && selectedDest) {
       const route = findShortestPath(
@@ -103,13 +113,14 @@ function App() {
         killedNodes,
         killedLinks,
         startTower,
-        endTower
+        endTower,
+        payloadText
       );
       setActiveRoute(route);
     } else {
       setActiveRoute(null);
     }
-  }, [config, selectedOrigin, selectedDest, startTower, endTower, killedNodes, killedLinks]);
+  }, [config, selectedOrigin, selectedDest, startTower, endTower, killedNodes, killedLinks, payloadText]);
 
   // Initial welcome logs on startup
   useEffect(() => {
@@ -126,7 +137,7 @@ function App() {
 
   const handleToggleNodeKilled = (id: string) => {
     if (id === selectedOrigin || id === selectedDest) {
-      alert("Cannot disable the selected origin or destination node during simulation setup.");
+      alert("Cannot disable the active origin or destination node.");
       return;
     }
     const newKilled = new Set(killedNodes);
@@ -140,12 +151,18 @@ function App() {
     setKilledNodes(newKilled);
   };
 
+  const handleRepairAll = () => {
+    setKilledNodes(new Set());
+    setKilledLinks(new Set());
+    addLog(`[CHAOS ENG] All systems repaired. Entire grid is nominal.`, 'success');
+  };
+
   const handleLoadDefaultUniverse = () => {
     setConfig(DEFAULT_UNIVERSE);
     setKilledNodes(new Set());
     setKilledLinks(new Set());
-    setSelectedOrigin('Aegis');
-    setSelectedDest('Caelum');
+    setSelectedOrigin('Boreas');
+    setSelectedDest('Elysium');
     setStartTower(0);
     setEndTower(0);
     setPayloadText('Hello world');
@@ -176,7 +193,7 @@ function App() {
 
     const animateHop = () => {
       if (hopIdx >= path.length - 1) {
-        // Simulation Completed successfully
+        // Completed
         const destNode = config.nodes.find(n => n.id === selectedDest)!;
         const encodedArray = encodeToBaseX(payloadText, destNode.codex);
         
@@ -197,12 +214,10 @@ function App() {
 
       addLog(`\n[HOP ${hopIdx + 1}] Origin: ${currentPlanetId} (Base ${currentPlanet.codex}) → Destination: ${nextPlanetId} (Base ${nextPlanet.codex})`, 'plain');
       
-      // Step 1: Codex Dialect Conversion
       const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
       addLog(`[ENC] Translating payload to next hop dialect (Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
-      addLog(`[TX] Serialized payload to binary laser stream. Beaming from Tower ${hopInfo.exit_tower} to Tower ${hopInfo.entry_tower}.`, 'info');
+      addLog(`[TX] Beaming signal from Tower ${hopInfo.exit_tower} to Tower ${hopInfo.entry_tower}.`, 'info');
 
-      // Step 2: Animate progress
       let p = 0;
       const duration = 1800; // ms
       const intervalTime = 30; // ms
@@ -215,12 +230,10 @@ function App() {
           clearInterval(progressInterval);
           setPacketProgress({ currentHopIndex: hopIdx, progress: 1 });
           
-          // Hop finished
           addLog(`[RX] Signal received at ${nextPlanetId} Tower ${hopInfo.entry_tower}.`, 'success');
           addLog(`[DEC] Decoded Base ${nextPlanet.codex} back to ASCII: "${payloadText}"`, 'success');
-          addLog(`[LATENCY] Hop void transmission: ${hopInfo.void_latency_ms.toFixed(2)}ms. Internal transit + processing: ${(hopInfo.internal_transit_latency_ms + hopInfo.tower_delay_ms).toFixed(2)}ms.`, 'warning');
+          addLog(`[LATENCY] Void transmission time: ${hopInfo.void_latency_ms.toFixed(2)}ms. Internal transit + processing: ${(hopInfo.internal_transit_latency_ms + hopInfo.tower_delay_ms).toFixed(2)}ms.`, 'warning');
 
-          // Next hop
           hopIdx++;
           if (hopIdx < path.length - 1) {
             setPacketProgress({ currentHopIndex: hopIdx, progress: 0 });
@@ -236,39 +249,63 @@ function App() {
   };
 
   return (
-    <div className="min-height-vh flex flex-col font-sans select-none pb-8">
-      {/* Navbar / Header */}
-      <header className="glass-panel border-b border-solid px-6 py-4 rounded-none mb-6">
-        <div className="max-w-[1600px] margin-auto flex justify-between items-center w-full">
-          <div className="flex items-center gap-3">
-            <div className="bg-[#00f2fe]/10 p-2 rounded-lg border border-[#00f2fe]/30 animate-pulse">
-              <Activity className="w-6 h-6 text-[#00f2fe]" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-widest uppercase glow-text-cyan font-display">
-                Relic Ring Protocol
-              </h1>
-              <p className="text-[0.65rem] text-slate-400 font-medium uppercase tracking-wider">
-                Zeta-26 Interplanetary Tactical Routing Engine
-              </p>
-            </div>
+    <div className="min-h-screen flex flex-col font-sans select-none pb-4">
+      {/* Header Layout matching screenshot */}
+      <header className="app-header">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#00f2fe]/10 p-2 rounded border border-[#00f2fe]/30 animate-pulse">
+            <Activity className="w-5 h-5 text-[#00f2fe]" />
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleLoadDefaultUniverse}
-              className="text-xs btn-secondary flex items-center gap-1.5 py-1.5 px-3"
-            >
-              <Cpu className="w-3.5 h-3.5" /> Reset Grid
-            </button>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-sm font-black tracking-widest uppercase glow-text-cyan font-display">
+              Relic Ring Protocol
+            </h1>
+            <span className="text-[0.62rem] text-slate-500 font-bold uppercase tracking-wider font-display">
+              &gt; Mission Control
+            </span>
           </div>
+        </div>
+        <div className="flex gap-4 text-[0.65rem] font-display font-bold tracking-wider text-slate-400">
+          <span className="cursor-pointer hover:text-white transition-colors border-b-2 border-solid border-[#00f2fe] pb-1">MISSION CONTROL</span>
+          <span className="cursor-pointer hover:text-white transition-colors pb-1">CODEX / SPECS</span>
         </div>
       </header>
 
       {/* Main Grid Layout */}
-      <main className="dashboard-grid flex-grow">
-        {/* Left Side: Map and Terminal Logs */}
-        <div className="flex flex-col gap-6">
-          {/* Tactical Star Map */}
+      <main className="main-layout flex-grow">
+        {/* Left Sidebar: Controls & Chaos */}
+        <ControlPanel
+          config={config}
+          onConfigChange={setConfig}
+          selectedOrigin={selectedOrigin}
+          selectedDest={selectedDest}
+          onSelectOrigin={setSelectedOrigin}
+          onSelectDest={setSelectedDest}
+          payloadText={payloadText}
+          setPayloadText={setPayloadText}
+          onRunSimulation={handleRunSimulation}
+          onResetSimulation={() => {
+            setSelectedOrigin('Boreas');
+            setSelectedDest('Elysium');
+            setStartTower(0);
+            setEndTower(0);
+            setPayloadText('Hello world');
+            setPacketProgress(null);
+            setIsSimulating(false);
+            setLogs([
+              { text: "=== CONSOLE RESET ===", type: "info" },
+              { text: "Ready.", type: "plain" }
+            ]);
+          }}
+          isSimulating={isSimulating}
+          onLoadDefaultUniverse={handleLoadDefaultUniverse}
+          killedNodes={killedNodes}
+          onToggleNodeKilled={handleToggleNodeKilled}
+          onRepairAll={handleRepairAll}
+        />
+
+        {/* Center Canvas & Metrics */}
+        <div className="flex flex-col h-full overflow-hidden">
           <StarMap
             config={config}
             selectedOrigin={selectedOrigin}
@@ -280,46 +317,21 @@ function App() {
             activeRoute={activeRoute}
             packetProgress={packetProgress}
           />
-
-          {/* Terminal Logs */}
-          <LogConsole logs={logs} onClearLogs={() => setLogs([])} />
-        </div>
-
-        {/* Right Side: Setup Form and Timing Metrics */}
-        <div className="flex flex-col gap-6">
-          <ControlPanel
-            config={config}
-            onConfigChange={setConfig}
-            selectedOrigin={selectedOrigin}
-            selectedDest={selectedDest}
-            onSelectOrigin={setSelectedOrigin}
-            onSelectDest={setSelectedDest}
-            startTower={startTower}
-            setStartTower={setStartTower}
-            endTower={endTower}
-            setEndTower={setEndTower}
-            payloadText={payloadText}
-            setPayloadText={setPayloadText}
-            onRunSimulation={handleRunSimulation}
-            onResetSimulation={() => {
-              setSelectedOrigin('Aegis');
-              setSelectedDest('Caelum');
-              setStartTower(0);
-              setEndTower(0);
-              setPayloadText('Hello world');
-              setPacketProgress(null);
-              setIsSimulating(false);
-              setLogs([
-                { text: "=== CONSOLE RESET ===", type: "info" },
-                { text: "Ready.", type: "plain" }
-              ]);
-            }}
-            isSimulating={isSimulating}
-            onLoadDefaultUniverse={handleLoadDefaultUniverse}
-          />
-
+          
           <LatencyMetrics activeRoute={activeRoute} />
         </div>
+
+        {/* Right Sidebar: Transmission Console */}
+        <LogConsole
+          config={config}
+          logs={logs}
+          onClearLogs={() => setLogs([])}
+          activeRoute={activeRoute}
+          packetProgress={packetProgress}
+          isSimulating={isSimulating}
+          selectedOrigin={selectedOrigin}
+          selectedDest={selectedDest}
+        />
       </main>
     </div>
   );

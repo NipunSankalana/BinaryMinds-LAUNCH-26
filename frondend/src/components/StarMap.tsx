@@ -18,8 +18,6 @@ export const StarMap: React.FC<StarMapProps> = ({
   config,
   selectedOrigin,
   selectedDest,
-  onSelectOrigin,
-  onSelectDest,
   killedNodes,
   onToggleNodeKilled,
   activeRoute,
@@ -52,10 +50,10 @@ export const StarMap: React.FC<StarMapProps> = ({
     const dx = maxX - minX || 2;
     const dy = maxY - minY || 2;
     return {
-      minX: minX - dx * 0.15,
-      maxX: maxX + dx * 0.15,
-      minY: minY - dy * 0.15,
-      maxY: maxY + dy * 0.15,
+      minX: minX - dx * 0.12,
+      maxX: maxX + dx * 0.12,
+      minY: minY - dy * 0.12,
+      maxY: maxY + dy * 0.12,
     };
   }, [config]);
 
@@ -75,7 +73,7 @@ export const StarMap: React.FC<StarMapProps> = ({
     return (
       <div className="glass-panel w-full h-[400px] flex flex-col items-center justify-center text-center p-8">
         <Activity className="w-12 h-12 text-slate-500 animate-pulse mb-4" />
-        <h3 className="text-xl text-slate-400 font-medium">Star Map Offline</h3>
+        <h3 className="text-xl text-slate-400 font-medium font-display">Star Map Offline</h3>
         <p className="text-sm text-slate-500 max-w-sm mt-2">
           Initialize the universe config to scan and map the star system.
         </p>
@@ -83,7 +81,7 @@ export const StarMap: React.FC<StarMapProps> = ({
     );
   }
 
-  // Draw grid lines (separate arrays for safe type checking)
+  // Draw grid lines
   const verticalGridVals: number[] = [];
   const horizontalGridVals: number[] = [];
   const gridDivs = 10;
@@ -102,14 +100,12 @@ export const StarMap: React.FC<StarMapProps> = ({
       const nB = config.nodes[j];
       const posB = toScreen(nB.x, nB.y);
 
-      // Check distance in km
       const dx = nA.x - nB.x;
       const dy = nA.y - nB.y;
       const distCenters = Math.sqrt(dx * dx + dy * dy) * scale;
       const voidDist = distCenters - (nA.radius_km + nA.atmosphere_thickness_km) - (nB.radius_km + nB.atmosphere_thickness_km);
 
       if (voidDist <= maxVoidHop) {
-        // Link exists
         const active = !!(activeRoute?.path.includes(nA.id) && activeRoute?.path.includes(nB.id) && Math.abs(activeRoute.path.indexOf(nA.id) - activeRoute.path.indexOf(nB.id)) === 1);
         const isKilled = killedNodes.has(nA.id) || killedNodes.has(nB.id);
 
@@ -145,7 +141,6 @@ export const StarMap: React.FC<StarMapProps> = ({
         const fromPos = toScreen(fromNode.x, fromNode.y);
         const toPos = toScreen(toNode.x, toNode.y);
 
-        // Linear interpolation of coordinate positions
         packetX = fromPos.x + (toPos.x - fromPos.x) * progress;
         packetY = fromPos.y + (toPos.y - fromPos.y) * progress;
         showPacketDot = true;
@@ -154,17 +149,22 @@ export const StarMap: React.FC<StarMapProps> = ({
   }
 
   const handlePlanetClick = (planet: Planet) => {
-    // If it's killed, we should alert
     if (killedNodes.has(planet.id)) {
       onToggleNodeKilled(planet.id); // Toggle it back to active
       return;
     }
 
-    if (!selectedOrigin) {
+    // Toggle origin/destination selection
+    if (selectedOrigin === planet.id) {
+      onSelectOrigin(null);
+    } else if (selectedDest === planet.id) {
+      onSelectDest(null);
+    } else if (!selectedOrigin) {
       onSelectOrigin(planet.id);
-    } else if (!selectedDest && selectedOrigin !== planet.id) {
+    } else if (!selectedDest) {
       onSelectDest(planet.id);
     } else {
+      // Both selected, clear destination and change origin
       onSelectOrigin(planet.id);
       onSelectDest(null);
     }
@@ -176,50 +176,81 @@ export const StarMap: React.FC<StarMapProps> = ({
     if (mapContainer) {
       setTooltipPos({
         x: rect.left - mapContainer.left + rect.width / 2,
-        y: rect.top - mapContainer.top - 100,
+        y: rect.top - mapContainer.top - 120,
       });
     }
     setHoveredNode(planet);
   };
 
-  return (
-    <div className="glass-panel flex flex-col relative w-full border border-solid p-6 overflow-hidden map-container">
-      {/* StarMap Header */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <Activity className="w-5 h-5 text-[#00f2fe]" />
-          <h2 className="text-md uppercase font-semibold text-[#00f2fe]">Zeta-26 Tactical Overlay</h2>
-        </div>
-        <div className="flex gap-4 text-xs font-medium text-slate-400">
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 bg-[#00f2fe] rounded-full inline-block"></span> Origin
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 bg-[#05ffb0] rounded-full inline-block"></span> Destination
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 bg-[#ff3366] rounded-full inline-block"></span> Offline (Killed)
-          </div>
-        </div>
-      </div>
+  // Base colors mapping for typography below nodes
+  const getBaseColor = (name: string) => {
+    const n = name.toLowerCase();
+    if (n === 'aegis') return '#5b9dff';
+    if (n === 'boreas') return '#ff5b5b';
+    if (n === 'dawn') return '#00e5ff';
+    if (n === 'fenix') return '#d885ff';
+    if (n === 'elysium') return '#ff9b44';
+    if (n === 'caelum') return '#ffd85b';
+    return '#8b9dff';
+  };
 
-      {/* SVG Canvas */}
-      <div className="bg-[#04060b] rounded-lg border border-solid overflow-hidden relative" style={{ height: svgHeight }}>
+  return (
+    <div className="glass-panel flex flex-col relative w-full border border-solid p-6 overflow-hidden map-container flex-grow h-full">
+      {/* Tactical Canvas */}
+      <div className="bg-[#030509] rounded-lg border border-solid border-[#00f2fe]/10 overflow-hidden relative flex-grow h-[470px]">
         <svg width="100%" height="100%" viewBox={`0 0 ${svgWidth} ${svgHeight}`} preserveAspectRatio="xMidYMid meet">
-          {/* Defs for gradients, filters, shadows */}
           <defs>
-            <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
+            <filter id="glow-cyan" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="8" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
-            <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
+            <filter id="glow-green" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="8" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
-            <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="6" result="blur" />
+            <filter id="glow-red" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="8" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
+
+            {/* 3D Planet Gradients */}
+            <radialGradient id="planet-aegis" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#8bc4ff" />
+              <stop offset="60%" stopColor="#0055ff" />
+              <stop offset="100%" stopColor="#001155" />
+            </radialGradient>
+            <radialGradient id="planet-boreas" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#ff9b9b" />
+              <stop offset="60%" stopColor="#cc1111" />
+              <stop offset="100%" stopColor="#440000" />
+            </radialGradient>
+            <radialGradient id="planet-dawn" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#8ef5ff" />
+              <stop offset="60%" stopColor="#0ca1b8" />
+              <stop offset="100%" stopColor="#023b45" />
+            </radialGradient>
+            <radialGradient id="planet-fenix" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#fbcffe" />
+              <stop offset="60%" stopColor="#a83cd4" />
+              <stop offset="100%" stopColor="#400459" />
+            </radialGradient>
+            <radialGradient id="planet-elysium" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#ffe1b3" />
+              <stop offset="60%" stopColor="#ea580c" />
+              <stop offset="100%" stopColor="#601802" />
+            </radialGradient>
+            <radialGradient id="planet-caelum" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#fff0ab" />
+              <stop offset="60%" stopColor="#d98902" />
+              <stop offset="100%" stopColor="#543500" />
+            </radialGradient>
+
+            {/* Dead Planet Gradient */}
+            <radialGradient id="planet-dead" cx="35%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#7a2b2b" />
+              <stop offset="70%" stopColor="#300d0d" />
+              <stop offset="100%" stopColor="#120404" />
+            </radialGradient>
           </defs>
 
           {/* Grid Background */}
@@ -232,7 +263,7 @@ export const StarMap: React.FC<StarMapProps> = ({
                 y1={0}
                 x2={screenPos.x}
                 y2={svgHeight}
-                stroke="rgba(255,255,255,0.02)"
+                stroke="rgba(0, 242, 254, 0.015)"
                 strokeWidth="1"
               />
             );
@@ -246,56 +277,56 @@ export const StarMap: React.FC<StarMapProps> = ({
                 y1={screenPos.y}
                 x2={svgWidth}
                 y2={screenPos.y}
-                stroke="rgba(255,255,255,0.02)"
+                stroke="rgba(0, 242, 254, 0.015)"
                 strokeWidth="1"
               />
             );
           })}
 
-          {/* Links */}
+          {/* Connectors (Links) */}
           {links.map((link, idx) => {
             const isRouteEdge = activeRoute?.path.includes(link.from) && activeRoute?.path.includes(link.to) && Math.abs(activeRoute.path.indexOf(link.from) - activeRoute.path.indexOf(link.to)) === 1;
 
             return (
               <g key={idx}>
                 {isRouteEdge ? (
-                  // Laser Link (Active Path)
+                  // Glowing Laser Beam
                   <line
                     x1={link.x1}
                     y1={link.y1}
                     x2={link.x2}
                     y2={link.y2}
-                    stroke={link.isKilled ? '#ff3366' : '#05ffb0'}
-                    strokeWidth="3.5"
+                    stroke={link.isKilled ? '#ff3366' : '#00f2fe'}
+                    strokeWidth="3"
                     className="laser-beam"
-                    filter="url(#glow-green)"
+                    filter={link.isKilled ? 'url(#glow-red)' : 'url(#glow-cyan)'}
                   />
                 ) : (
-                  // Inactive / Void limit link
+                  // Standard Link
                   <line
                     x1={link.x1}
                     y1={link.y1}
                     x2={link.x2}
                     y2={link.y2}
-                    stroke={link.isKilled ? 'rgba(255,51,102,0.1)' : 'rgba(255,255,255,0.05)'}
-                    strokeWidth="1.5"
-                    strokeDasharray="4 4"
+                    stroke={link.isKilled ? 'rgba(255,51,102,0.06)' : 'rgba(255,255,255,0.035)'}
+                    strokeWidth="1.2"
+                    strokeDasharray="4 6"
                   />
                 )}
               </g>
             );
           })}
 
-          {/* Planets and Atmos */}
+          {/* Planets rendering */}
           {config.nodes.map((planet) => {
             const pos = toScreen(planet.x, planet.y);
             const isOrigin = selectedOrigin === planet.id;
             const isDest = selectedDest === planet.id;
             const isKilled = killedNodes.has(planet.id);
-            const rPx = 18 + planet.radius_km / 1200; // Visual radius mapping
-            const atmosPx = rPx + 6 + planet.atmosphere_thickness_km / 40;
+            const rPx = 25 + planet.radius_km / 1200; 
+            const atmosPx = rPx + 8 + planet.atmosphere_thickness_km / 35;
 
-            let strokeColor = 'rgba(255,255,255,0.15)';
+            let strokeColor = 'transparent';
             let glowFilter = '';
 
             if (isOrigin) {
@@ -317,84 +348,67 @@ export const StarMap: React.FC<StarMapProps> = ({
                 onMouseEnter={(e) => showTooltip(e, planet)}
                 onMouseLeave={() => setHoveredNode(null)}
               >
-                {/* Orbit/Atmosphere Halo Ring */}
+                {/* Outer active path highlight ring */}
+                {(isOrigin || isDest) && (
+                  <circle
+                    cx={pos.x}
+                    cy={pos.y}
+                    r={atmosPx + 3}
+                    fill="transparent"
+                    stroke={isOrigin ? '#00f2fe' : '#05ffb0'}
+                    strokeWidth="1.5"
+                    opacity="0.8"
+                    filter={isOrigin ? 'url(#glow-cyan)' : 'url(#glow-green)'}
+                  />
+                )}
+
+                {/* Atmosphere ring halo */}
                 <circle
                   cx={pos.x}
                   cy={pos.y}
                   r={atmosPx}
                   fill="transparent"
-                  stroke={isKilled ? 'rgba(255, 51, 102, 0.15)' : isOrigin ? 'rgba(0, 242, 254, 0.15)' : isDest ? 'rgba(5, 255, 176, 0.15)' : 'rgba(255,255,255,0.03)'}
+                  stroke={isKilled ? 'rgba(255, 51, 102, 0.2)' : isOrigin ? 'rgba(0, 242, 254, 0.25)' : isDest ? 'rgba(5, 255, 176, 0.25)' : 'rgba(255, 255, 255, 0.05)'}
                   strokeWidth="1.5"
-                  strokeDasharray="3 3"
+                  strokeDasharray="4 4"
                 />
 
-                {/* Subsurface Fiber Ring */}
-                <circle
-                  cx={pos.x}
-                  cy={pos.y}
-                  r={rPx + 1}
-                  fill="transparent"
-                  stroke={isKilled ? 'rgba(255,51,102,0.3)' : 'rgba(255,255,255,0.1)'}
-                  strokeWidth="1"
-                />
-
-                {/* Planet Sphere */}
+                {/* Planet 3D Sphere */}
                 <circle
                   cx={pos.x}
                   cy={pos.y}
                   r={rPx}
-                  fill={isKilled ? 'rgba(30,10,20,0.8)' : 'rgba(17,24,39,0.9)'}
+                  fill={isKilled ? 'url(#planet-dead)' : `url(#planet-${planet.id.toLowerCase()})`}
                   stroke={strokeColor}
-                  strokeWidth={isOrigin || isDest || isKilled ? 2 : 1}
+                  strokeWidth={isOrigin || isDest || isKilled ? 2 : 0}
                   filter={glowFilter}
                 />
 
-                {/* Draw Towers as small dots on the surface ring */}
-                {Array.from({ length: planet.active_towers }).map((_, tIdx) => {
-                  // Angle
-                  const N = planet.active_towers;
-                  const theta = Math.PI / 2 - (tIdx * 2 * Math.PI) / N;
-                  const tx = pos.x + rPx * Math.cos(theta);
-                  const ty = pos.y + rPx * Math.sin(theta);
-
-                  return (
-                    <circle
-                      key={tIdx}
-                      cx={tx}
-                      cy={ty}
-                      r="2"
-                      fill={isKilled ? '#ff3366' : '#94a3b8'}
-                      opacity={isKilled ? 0.4 : 0.8}
-                    />
-                  );
-                })}
-
-                {/* Planet Label */}
+                {/* Star Map node labels below planet */}
                 <text
                   x={pos.x}
                   y={pos.y + rPx + 20}
                   textAnchor="middle"
-                  fill={isKilled ? '#ff3366' : isOrigin ? '#00f2fe' : isDest ? '#05ffb0' : '#e2e8f0'}
-                  className="text-[0.65rem] tracking-wider uppercase font-semibold font-display"
+                  fill={isKilled ? '#ff3366' : '#ffffff'}
+                  className="text-xs tracking-wider uppercase font-bold font-display"
                 >
                   {planet.id}
                 </text>
 
-                {/* Codex Label Indicator */}
                 <text
                   x={pos.x}
-                  y={pos.y - rPx - 8}
+                  y={pos.y + rPx + 32}
                   textAnchor="middle"
-                  fill="#64748b"
-                  className="text-[0.55rem] font-mono"
+                  fill={isKilled ? 'rgba(255, 51, 102, 0.6)' : getBaseColor(planet.id)}
+                  className="text-[0.62rem] font-display font-semibold uppercase tracking-widest"
                 >
-                  B{planet.codex}
+                  Base-{planet.codex}
                 </text>
               </g>
             );
           })}
 
-          {/* Packet Dot */}
+          {/* Beaming glowing packet pulse */}
           {showPacketDot && (
             <circle
               cx={packetX}
@@ -407,25 +421,38 @@ export const StarMap: React.FC<StarMapProps> = ({
           )}
         </svg>
 
-        {/* Floating Tooltip / Info Card */}
+        {/* Tactical overlay indicators */}
+        <div className="absolute top-3 right-4 text-[0.6rem] font-mono text-slate-500 bg-black/60 px-2 py-1 rounded border border-solid border-slate-800 text-right">
+          <div>SYS: Zeta-26</div>
+          <div>SCALE: 1U = 100,000KM</div>
+          <div>LMAX: 50,000,000KM</div>
+        </div>
+
+        {/* Hover info Card */}
         {hoveredNode && (
           <div
-            className="absolute z-50 glass-panel glass-panel-accent-cyan p-4 w-64 rounded-md pointer-events-auto shadow-2xl transition-all select-none text-left"
+            className="absolute z-50 glass-panel p-4 w-60 rounded pointer-events-auto border border-solid border-[#00f2fe]/30 shadow-2xl transition-all text-left"
             style={{
-              left: Math.min(Math.max(10, tooltipPos.x - 128), svgWidth - 270),
+              left: Math.min(Math.max(10, tooltipPos.x - 120), svgWidth - 250),
               top: Math.max(10, tooltipPos.y - 120),
             }}
           >
-            <div className="flex justify-between items-center border-b border-solid pb-1 mb-2">
-              <span className="font-display text-sm font-semibold tracking-wider text-[#00f2fe] uppercase">
+            <div className="flex justify-between items-center border-b border-solid pb-1 mb-2 border-slate-800">
+              <span className="font-display text-xs font-bold tracking-wider text-white uppercase">
                 {hoveredNode.id}
               </span>
-              <span className="font-mono text-[0.65rem] bg-slate-800 px-1.5 py-0.5 rounded text-slate-300">
+              <span
+                className="font-mono text-[0.55rem] px-1.5 py-0.5 rounded font-semibold"
+                style={{
+                  backgroundColor: `${getBaseColor(hoveredNode.id)}20`,
+                  color: getBaseColor(hoveredNode.id),
+                }}
+              >
                 CODEX BASE {hoveredNode.codex}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-[0.7rem] text-slate-400 font-sans">
+            <div className="grid grid-cols-2 gap-y-1 gap-x-2 text-[0.65rem] text-slate-400 font-sans">
               <div>Coordinates:</div>
               <div className="text-right text-slate-200 font-mono">
                 ({hoveredNode.x}, {hoveredNode.y})
@@ -452,9 +479,9 @@ export const StarMap: React.FC<StarMapProps> = ({
               </div>
             </div>
 
-            <div className="flex gap-2 mt-3 pt-2 border-t border-solid">
+            <div className="flex gap-2 mt-3 pt-2 border-t border-solid border-slate-800">
               <button
-                className={`text-[0.65rem] font-display w-full py-1 rounded transition-colors ${
+                className={`text-[0.6rem] font-display font-semibold w-full py-1 rounded transition-colors ${
                   killedNodes.has(hoveredNode.id)
                     ? 'bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/30 text-emerald-400'
                     : 'bg-rose-950/60 hover:bg-rose-900 border border-rose-500/30 text-[#ff3366]'
@@ -466,11 +493,11 @@ export const StarMap: React.FC<StarMapProps> = ({
               >
                 {killedNodes.has(hoveredNode.id) ? (
                   <span className="flex items-center justify-center gap-1">
-                    <Power className="w-2.5 h-2.5" /> Restore Node
+                    <Power className="w-2.5 h-2.5" /> RESTORE NODE
                   </span>
                 ) : (
                   <span className="flex items-center justify-center gap-1">
-                    <Power className="w-2.5 h-2.5" /> Kill Planet
+                    <Power className="w-2.5 h-2.5" /> DISABLE NODE
                   </span>
                 )}
               </button>
