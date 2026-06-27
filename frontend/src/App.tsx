@@ -237,14 +237,45 @@ function App() {
       setStartTower(0);
       setEndTower(0);
       setPayloadText('Hello world');
-      setLogs([
-        { text: "=== RELIC RING CORE PROTOCOL CONSOLE ===", type: "info" },
-        { text: "Zeta-26 Core configuration reloaded and reset.", type: "success" }
-      ]);
+
+      api.resetUniverse().then(res => {
+        setConfig({
+          universe_metadata: res.metadata,
+          nodes: res.nodes,
+        });
+        setLogs([
+          { text: "=== RELIC RING CORE PROTOCOL CONSOLE ===", type: "info" },
+          { text: "Zeta-26 Core configuration reloaded and reset.", type: "success" }
+        ]);
+        if (res.nodes.length > 0) {
+          setInspectedPlanetId(res.nodes[0].id);
+        }
+      }).catch(err => {
+        addLog(`Error reloading core configuration: ${err.message}`, 'error');
+      });
     }).catch(err => {
       addLog(`Error resetting simulation: ${err.message}`, 'error');
     });
   };
+
+
+  const handleConfigChange = (newConfig: any) => {
+    api.updateUniverse(newConfig)
+      .then(res => {
+        setConfig({
+          universe_metadata: res.metadata,
+          nodes: res.nodes,
+        });
+        addLog(`[SYSTEM CONFIG] Loaded custom config. ${res.nodes.length} planets mapped.`, 'success');
+        if (res.nodes.length > 0) {
+          setInspectedPlanetId(res.nodes[0].id);
+        }
+      })
+      .catch(err => {
+        addLog(`[CONFIG ERROR] Failed to update backend: ${err.message}`, 'error');
+      });
+  };
+
 
   const handleRepairAll = () => {
     api.resetSimulation().then(() => {
@@ -437,7 +468,7 @@ function App() {
         <div className="flex flex-col gap-4">
           <ControlPanel
             config={config}
-            onConfigChange={setConfig}
+            onConfigChange={handleConfigChange}
             selectedOrigin={selectedOrigin}
             selectedDest={selectedDest}
             onSelectOrigin={setSelectedOrigin}

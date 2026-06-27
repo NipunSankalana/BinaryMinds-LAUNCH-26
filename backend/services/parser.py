@@ -56,6 +56,9 @@ def _find_config() -> Path:
     )
 
 
+_current_universe = None
+
+
 @lru_cache(maxsize=1)
 def get_universe() -> UniverseConfig:
     """
@@ -66,6 +69,10 @@ def get_universe() -> UniverseConfig:
         FileNotFoundError: if the config file cannot be located
         ValueError: if the JSON is malformed or missing required fields
     """
+    global _current_universe
+    if _current_universe is not None:
+        return _current_universe
+
     config_path = _find_config()
 
     try:
@@ -88,7 +95,17 @@ def get_universe() -> UniverseConfig:
     return universe
 
 
+def set_universe(config: UniverseConfig):
+    """Override the active universe configuration in memory."""
+    global _current_universe
+    _current_universe = config
+    get_universe.cache_clear()
+
+
 def reload_universe() -> UniverseConfig:
     """Force a fresh load (clears the cache). Useful for testing."""
+    global _current_universe
+    _current_universe = None
     get_universe.cache_clear()
     return get_universe()
+

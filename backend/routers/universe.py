@@ -9,7 +9,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from models.universe import UniverseMetadata, NodeModel
+from models.universe import UniverseMetadata, NodeModel, UniverseConfig
 from models.edge import EdgeModel
 from services.parser import get_universe
 from services.dijkstra import get_all_edges
@@ -46,3 +46,44 @@ def init_universe() -> UniverseInitResponse:
         nodes=config.nodes,
         edges=edges,
     )
+
+
+@router.post("/update", response_model=UniverseInitResponse, summary="Update Universe Config")
+def update_universe(config: UniverseConfig) -> UniverseInitResponse:
+    """
+    Update the active universe configuration in-memory.
+    Recalculates all edges and returns the new topology.
+    """
+    try:
+        from services.parser import set_universe
+        set_universe(config)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    edges = get_all_edges(config)
+
+    return UniverseInitResponse(
+        metadata=config.universe_metadata,
+        nodes=config.nodes,
+        edges=edges,
+    )
+
+
+@router.post("/reset", response_model=UniverseInitResponse, summary="Reset Universe to Config file")
+def reset_universe_endpoint() -> UniverseInitResponse:
+    """Reset the universe configuration to the universe-config.json file on disk."""
+    try:
+        from services.parser import reload_universe
+        config = reload_universe()
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    edges = get_all_edges(config)
+
+    return UniverseInitResponse(
+        metadata=config.universe_metadata,
+        nodes=config.nodes,
+        edges=edges,
+    )
+
+

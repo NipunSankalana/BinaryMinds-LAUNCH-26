@@ -130,6 +130,19 @@ export const api = {
   initializeUniverse: () => 
     request<UniverseInitResponse>('/api/universe/init'),
 
+  updateUniverse: (config: any) =>
+    request<UniverseInitResponse>('/api/universe/update', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    }),
+
+  resetUniverse: () =>
+    request<UniverseInitResponse>('/api/universe/reset', {
+      method: 'POST',
+    }),
+
+
+
   findRoute: (req: RouteRequest) => 
     request<RouteResponse>('/api/route/find', {
       method: 'POST',
