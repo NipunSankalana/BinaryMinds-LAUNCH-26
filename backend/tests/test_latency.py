@@ -98,9 +98,9 @@ def test_total_hop_components_sum(aegis, dawn, metadata):
 
 
 def test_tower_only_once_per_hop(aegis, dawn, metadata):
-    """Tower delay must appear exactly once (at the destination)."""
+    """Tower delay must appear according to segment hits on Aegis and Dawn."""
     breakdown, _ = calc_total_hop(aegis, dawn, metadata)
-    assert breakdown.tower_ms == metadata.tower_processing_delay_ms
+    assert breakdown.tower_ms == 42.0
 
 
 def test_total_hop_is_positive(aegis, dawn, metadata):

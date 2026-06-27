@@ -1,11 +1,6 @@
 """
 Packet simulation service.
-Orchestrates the full packet delivery lifecycle:
-  1. Find the best route (Dijkstra)
-  2. For each hop: encode payload → compute latency → build HopEntry
-  3. Return a complete Packet with hop_log and total latency.
-
-This is the main integration point that calls dijkstra, latency, and translator.
+Orchestrates the full packet delivery lifecycle using the tower-based routing model.
 """
 
 from __future__ import annotations
@@ -13,10 +8,15 @@ from typing import List, Optional, Set, Tuple
 
 import networkx as nx
 
-from models.packet import Packet, HopEntry
+from models.packet import Packet, HopEntry, LatencyBreakdown
 from models.universe import UniverseConfig, NodeModel
-from services.dijkstra import find_route, estimate_route_latency
-from services.latency import calc_total_hop, calc_void_distance
+from services.dijkstra import find_route_tower
+from services.latency import (
+    calc_void_distance,
+    calc_void_travel_time,
+    calculate_crust_transit_time,
+    find_closest_tower_pair,
+)
 from services.translator import translate_hop
 
 
@@ -36,49 +36,21 @@ def simulate_delivery(
     killed_nodes: Optional[Set[str]] = None,
     killed_edges: Optional[Set[Tuple[str, str]]] = None,
 ) -> Packet:
-    """
-    Simulate a full packet delivery from origin to destination.
-
-    Steps:
-      - Find the lowest-latency route (excludes killed nodes/edges).
-      - For each consecutive pair in the route, compute:
-          * Codex translation (encode before hop, decode on arrival)
-          * Latency breakdown (fiber, atmosphere, void, tower)
-          * HopEntry record
-      - Sum total latency.
-      - Return a Packet with all mandatory fields.
-
-    Args:
-        config:        Universe configuration (parsed from json).
-        origin:        Source planet ID.
-        destination:   Target planet ID.
-        payload:       ASCII message to transmit.
-        killed_nodes:  Set of dead planet IDs.
-        killed_edges:  Set of dead (src, dst) link tuples.
-
-    Returns:
-        A fully populated Packet object.
-
-    Raises:
-        ValueError: Bad node IDs or config issues.
-        nx.NetworkXNoPath: No route exists.
-    """
     killed_nodes = killed_nodes or set()
     killed_edges = killed_edges or set()
 
     # ------------------------------------------------------------------ #
-    # Step 1 — Route finding
+    # Step 1 — Route finding using Tower-based Dijkstra
     # ------------------------------------------------------------------ #
     try:
-        route: List[str] = find_route(
+        route, total_latency_ms, entry_tower_map, exit_tower_map = find_route_tower(
             config=config,
-            origin=origin,
-            destination=destination,
+            origin_id=origin,
+            dest_id=destination,
             killed_nodes=killed_nodes,
             killed_edges=killed_edges,
         )
     except nx.NetworkXNoPath as exc:
-        # Return a failed packet rather than crashing the API
         return Packet(
             origin_id=origin,
             destination_id=destination,
@@ -107,9 +79,13 @@ def simulate_delivery(
     # Step 2 — Hop-by-hop simulation
     # ------------------------------------------------------------------ #
     metadata = config.universe_metadata
+    c = metadata.speed_of_light_kms
+    ff = metadata.fiber_speed_fraction
+    td = metadata.tower_processing_delay_ms
+    scale = metadata.coordinate_scale_unit_km
+
     hop_log: List[HopEntry] = []
-    total_latency_ms = 0.0
-    current_payload = payload    # always the ASCII original; encoding is per-hop
+    current_payload = payload
 
     for i in range(len(route) - 1):
         src_id = route[i]
@@ -125,9 +101,45 @@ def simulate_delivery(
             dest_codex=dst_node.codex,
         )
 
-        # Latency calculation
-        breakdown, hop_latency_ms = calc_total_hop(src_node, dst_node, metadata)
-        void_dist = calc_void_distance(src_node, dst_node, metadata.coordinate_scale_unit_km)
+        entry_tower_src = entry_tower_map[src_id]
+        exit_tower_src = exit_tower_map[src_id]
+        entry_tower_dst = entry_tower_map[dst_id]
+
+        transit_src = calculate_crust_transit_time(src_node, entry_tower_src, exit_tower_src, ff, c, td)
+
+        is_last_hop = (i == len(route) - 2)
+        if is_last_hop:
+            exit_tower_dst = exit_tower_map[dst_id]  # should be 0
+            transit_dst = calculate_crust_transit_time(dst_node, entry_tower_dst, exit_tower_dst, ff, c, td)
+        else:
+            transit_dst = {"fiber_time_ms": 0.0, "tower_delay_ms": 0.0, "total_transit_ms": 0.0}
+
+        void_dist = calc_void_distance(src_node, dst_node, scale)
+
+        fiber_exit_ms = transit_src["fiber_time_ms"]
+        atmosphere_exit_ms = (src_node.atmosphere_thickness_km * src_node.refraction_index / c) * 1000.0
+        void_ms = (void_dist / c) * 1000.0
+        atmosphere_entry_ms = (dst_node.atmosphere_thickness_km * dst_node.refraction_index / c) * 1000.0
+        tower_ms = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
+        fiber_entry_ms = transit_dst["fiber_time_ms"]
+
+        hop_latency_ms = (
+            fiber_exit_ms
+            + atmosphere_exit_ms
+            + void_ms
+            + atmosphere_entry_ms
+            + tower_ms
+            + fiber_entry_ms
+        )
+
+        breakdown = LatencyBreakdown(
+            fiber_exit_ms=round(fiber_exit_ms, 6),
+            atmosphere_exit_ms=round(atmosphere_exit_ms, 6),
+            void_ms=round(void_ms, 6),
+            atmosphere_entry_ms=round(atmosphere_entry_ms, 6),
+            tower_ms=round(tower_ms, 6),
+            fiber_entry_ms=round(fiber_entry_ms, 6),
+        )
 
         hop_entry = HopEntry(
             from_node=src_id,
@@ -138,18 +150,17 @@ def simulate_delivery(
             source_codex=src_node.codex,
             dest_codex=dst_node.codex,
             latency_breakdown=breakdown,
-            total_hop_latency_ms=hop_latency_ms,
+            total_hop_latency_ms=round(hop_latency_ms, 6),
         )
         hop_log.append(hop_entry)
-        total_latency_ms += hop_latency_ms
-        current_payload = decoded   # carry forward (should equal original)
+        current_payload = decoded
 
     # ------------------------------------------------------------------ #
     # Step 3 — Assemble packet
     # ------------------------------------------------------------------ #
     status = "delivered"
     if killed_nodes or killed_edges:
-        status = "rerouted"   # flag that chaos was active during this delivery
+        status = "rerouted"
 
     return Packet(
         origin_id=origin,

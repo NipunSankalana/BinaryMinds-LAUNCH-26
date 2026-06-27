@@ -18,6 +18,8 @@ export const StarMap: React.FC<StarMapProps> = ({
   config,
   selectedOrigin,
   selectedDest,
+  onSelectOrigin,
+  onSelectDest,
   killedNodes,
   onToggleNodeKilled,
   activeRoute,

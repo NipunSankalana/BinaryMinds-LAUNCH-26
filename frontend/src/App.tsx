@@ -156,6 +156,16 @@ function App() {
     });
   };
 
+  const handleRepairAll = () => {
+    api.resetSimulation().then(() => {
+      setKilledNodes(new Set());
+      setKilledLinks(new Set());
+      addLog(`[CHAOS ENG] All systems repaired. Entire grid is nominal.`, 'success');
+    }).catch(err => {
+      addLog(`[CHAOS ENG] Error repairing grid: ${err.message}`, 'error');
+    });
+  };
+
   const handleRunSimulation = () => {
     if (!config || !selectedOrigin || !selectedDest || !activeRoute) return;
     if (activeRoute.error) {
@@ -252,39 +262,63 @@ function App() {
   };
 
   return (
-    <div className="min-height-vh flex flex-col font-sans select-none pb-8">
-      {/* Navbar / Header */}
-      <header className="glass-panel border-b border-solid px-6 py-4 rounded-none mb-6">
-        <div className="max-w-[1600px] margin-auto flex justify-between items-center w-full">
-          <div className="flex items-center gap-3">
-            <div className="bg-[#00f2fe]/10 p-2 rounded-lg border border-[#00f2fe]/30 animate-pulse">
-              <Activity className="w-6 h-6 text-[#00f2fe]" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-widest uppercase glow-text-cyan font-display">
-                Relic Ring Protocol
-              </h1>
-              <p className="text-[0.65rem] text-slate-400 font-medium uppercase tracking-wider">
-                Zeta-26 Interplanetary Tactical Routing Engine
-              </p>
-            </div>
+    <div className="min-h-screen flex flex-col font-sans select-none pb-4">
+      {/* Header Layout matching screenshot */}
+      <header className="app-header">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#00f2fe]/10 p-2 rounded border border-[#00f2fe]/30 animate-pulse">
+            <Activity className="w-5 h-5 text-[#00f2fe]" />
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleLoadDefaultUniverse}
-              className="text-xs btn-secondary flex items-center gap-1.5 py-1.5 px-3"
-            >
-              <Cpu className="w-3.5 h-3.5" /> Reset Grid
-            </button>
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-sm font-black tracking-widest uppercase glow-text-cyan font-display">
+              Relic Ring Protocol
+            </h1>
+            <span className="text-[0.62rem] text-slate-500 font-bold uppercase tracking-wider font-display">
+              &gt; Mission Control
+            </span>
           </div>
+        </div>
+        <div className="flex gap-4 text-[0.65rem] font-display font-bold tracking-wider text-slate-400">
+          <span className="cursor-pointer hover:text-white transition-colors border-b-2 border-solid border-[#00f2fe] pb-1">MISSION CONTROL</span>
+          <span className="cursor-pointer hover:text-white transition-colors pb-1">CODEX / SPECS</span>
         </div>
       </header>
 
       {/* Main Grid Layout */}
-      <main className="dashboard-grid flex-grow">
-        {/* Left Side: Map and Terminal Logs */}
-        <div className="flex flex-col gap-6">
-          {/* Tactical Star Map */}
+      <main className="main-layout flex-grow">
+        {/* Left Sidebar: Controls & Chaos */}
+        <ControlPanel
+          config={config}
+          onConfigChange={setConfig}
+          selectedOrigin={selectedOrigin}
+          selectedDest={selectedDest}
+          onSelectOrigin={setSelectedOrigin}
+          onSelectDest={setSelectedDest}
+          payloadText={payloadText}
+          setPayloadText={setPayloadText}
+          onRunSimulation={handleRunSimulation}
+          onResetSimulation={() => {
+            setSelectedOrigin('Aegis');
+            setSelectedDest('Caelum');
+            setStartTower(0);
+            setEndTower(0);
+            setPayloadText('Hello world');
+            setPacketProgress(null);
+            setIsSimulating(false);
+            setLogs([
+              { text: "=== CONSOLE RESET ===", type: "info" },
+              { text: "Ready.", type: "plain" }
+            ]);
+          }}
+          isSimulating={isSimulating}
+          onLoadDefaultUniverse={handleLoadDefaultUniverse}
+          killedNodes={killedNodes}
+          onToggleNodeKilled={handleToggleNodeKilled}
+          onRepairAll={handleRepairAll}
+        />
+
+        {/* Center Canvas & Metrics */}
+        <div className="flex flex-col h-full overflow-hidden">
           <StarMap
             config={config}
             selectedOrigin={selectedOrigin}
@@ -296,46 +330,21 @@ function App() {
             activeRoute={activeRoute}
             packetProgress={packetProgress}
           />
-
-          {/* Terminal Logs */}
-          <LogConsole logs={logs} onClearLogs={() => setLogs([])} />
-        </div>
-
-        {/* Right Side: Setup Form and Timing Metrics */}
-        <div className="flex flex-col gap-6">
-          <ControlPanel
-            config={config}
-            onConfigChange={setConfig}
-            selectedOrigin={selectedOrigin}
-            selectedDest={selectedDest}
-            onSelectOrigin={setSelectedOrigin}
-            onSelectDest={setSelectedDest}
-            startTower={startTower}
-            setStartTower={setStartTower}
-            endTower={endTower}
-            setEndTower={setEndTower}
-            payloadText={payloadText}
-            setPayloadText={setPayloadText}
-            onRunSimulation={handleRunSimulation}
-            onResetSimulation={() => {
-              setSelectedOrigin('Aegis');
-              setSelectedDest('Caelum');
-              setStartTower(0);
-              setEndTower(0);
-              setPayloadText('Hello world');
-              setPacketProgress(null);
-              setIsSimulating(false);
-              setLogs([
-                { text: "=== CONSOLE RESET ===", type: "info" },
-                { text: "Ready.", type: "plain" }
-              ]);
-            }}
-            isSimulating={isSimulating}
-            onLoadDefaultUniverse={handleLoadDefaultUniverse}
-          />
-
+          
           <LatencyMetrics activeRoute={activeRoute} />
         </div>
+
+        {/* Right Sidebar: Transmission Console */}
+        <LogConsole
+          config={config}
+          logs={logs}
+          onClearLogs={() => setLogs([])}
+          activeRoute={activeRoute}
+          packetProgress={packetProgress}
+          isSimulating={isSimulating}
+          selectedOrigin={selectedOrigin}
+          selectedDest={selectedDest}
+        />
       </main>
     </div>
   );

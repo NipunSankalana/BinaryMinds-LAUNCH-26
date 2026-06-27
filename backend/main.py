@@ -28,9 +28,9 @@ async def lifespan(app: FastAPI):
     """Validate universe config at startup. Fail loudly if broken."""
     try:
         config = get_universe()
-        print(f"✅ Universe loaded: {config.universe_metadata.system_name} — {len(config.nodes)} planets ready.")
+        print(f"[OK] Universe loaded: {config.universe_metadata.system_name} - {len(config.nodes)} planets ready.")
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
-        print(f"❌ STARTUP FAILED: {exc}")
+        print(f"[FAIL] STARTUP FAILED: {exc}")
         raise RuntimeError(f"Cannot start server: {exc}") from exc
     yield   # server runs here
 
