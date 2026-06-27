@@ -216,12 +216,20 @@ function App() {
           
           const { towerA, towerB } = findClosestTowerPair(currentPlanet, nextPlanet, config.universe_metadata.coordinate_scale_unit_km || 100000);
 
-          addLog(`\n[HOP ${hopIdx + 1}] Origin: ${currentPlanetId} (Base ${currentPlanet.codex}) → Destination: ${nextPlanetId} (Base ${nextPlanet.codex})`, 'plain');
+          addLog(`\n[HOP ${hopIdx + 1}] ${currentPlanetId} → ${nextPlanetId}`, 'plain');
           
-          // Step 1: Codex Dialect Conversion
+          // Codex Dialect Conversion
           const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
-          addLog(`[ENC] Translating payload to next hop dialect (Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
-          addLog(`[TX] Serialized payload to binary laser stream. Beaming from Tower ${towerA} to Tower ${towerB}.`, 'info');
+          addLog(`  ▶ [ENC] Translate Payload (ASCII -> Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
+          
+          // Internal transit at source
+          addLog(`  ▶ [PLANET ${currentPlanetId}] Subsurface transit: Center to Egress Tower ${towerA} (+${hopInfo.latency_breakdown.fiber_exit_ms.toFixed(2)} ms)`, 'plain');
+          
+          // Atmosphere exit
+          addLog(`  ▶ [SPACE] Egress: Beaming laser through atmosphere at ${currentPlanetId} (+${hopInfo.latency_breakdown.atmosphere_exit_ms.toFixed(2)} ms)`, 'info');
+          
+          // Void travel
+          addLog(`  ▶ [SPACE] Void Transit: Beaming over vacuum (${hopInfo.void_distance_km.toLocaleString()} km) (+${hopInfo.latency_breakdown.void_ms.toFixed(2)} ms)`, 'info');
 
           // Step 2: Animate progress
           let p = 0;
@@ -237,9 +245,19 @@ function App() {
               setPacketProgress({ currentHopIndex: hopIdx, progress: 1 });
               
               // Hop finished
-              addLog(`[RX] Signal received at ${nextPlanetId} Tower ${towerB}.`, 'success');
-              addLog(`[DEC] Decoded Base ${nextPlanet.codex} back to ASCII: "${payloadText}"`, 'success');
-              addLog(`[LATENCY] Hop void transmission: ${hopInfo.latency_breakdown.void_ms.toFixed(2)}ms. Internal transit + processing: ${(hopInfo.latency_breakdown.fiber_exit_ms + hopInfo.latency_breakdown.fiber_entry_ms + hopInfo.latency_breakdown.tower_ms).toFixed(2)}ms.`, 'warning');
+              addLog(`  ▶ [SPACE] Ingress: Entering atmosphere at ${nextPlanetId} (+${hopInfo.latency_breakdown.atmosphere_entry_ms.toFixed(2)} ms)`, 'info');
+              addLog(`  ▶ [PLANET ${nextPlanetId}] Ingress Tower ${towerB}: Received signal & processed (+${hopInfo.latency_breakdown.tower_ms.toFixed(2)} ms)`, 'success');
+              
+              if (hopIdx === path.length - 2) {
+                // Final Arrive
+                addLog(`  ▶ [PLANET ${nextPlanetId}] Subsurface transit: Ingress Tower ${towerB} to target client (+${hopInfo.latency_breakdown.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
+              } else {
+                // Relay transit
+                addLog(`  ▶ [PLANET ${nextPlanetId}] Internal routing: Ingress Tower ${towerB} to Egress Tower (+${hopInfo.latency_breakdown.fiber_entry_ms.toFixed(2)} ms)`, 'plain');
+              }
+
+              addLog(`  ▶ [DEC] Decoded Base ${nextPlanet.codex} back to ASCII: "${payloadText}"`, 'success');
+              addLog(`  ✓ Hop total latency: ${hopInfo.total_hop_latency_ms.toFixed(2)} ms`, 'warning');
 
               // Next hop
               hopIdx++;
