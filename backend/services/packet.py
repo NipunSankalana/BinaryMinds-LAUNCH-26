@@ -141,12 +141,9 @@ def simulate_delivery(
         tower_ms           = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
 
         hop_latency_ms = (
-            fiber_exit_ms
-            + atmosphere_exit_ms
+            atmosphere_exit_ms
             + void_ms
             + atmosphere_entry_ms
-            + tower_ms
-            + fiber_entry_ms
         )
 
         breakdown = LatencyBreakdown(
@@ -174,6 +171,17 @@ def simulate_delivery(
         )
         hop_log.append(hop_entry)
         current_payload = decoded
+
+    # Calculate Grand Total Latency dynamically: Sum(Tp_nodes) + Sum(T_void_hops)
+    total_latency_ms = 0.0
+    for entry in hop_log:
+        total_latency_ms += entry.latency_breakdown.atmosphere_exit_ms + entry.latency_breakdown.void_ms + entry.latency_breakdown.atmosphere_entry_ms
+    for node_id in route:
+        node = _node_by_id(config, node_id)
+        transit = calculate_crust_transit_time(
+            node, entry_tower_map[node_id], exit_tower_map[node_id], ff, c, td
+        )
+        total_latency_ms += transit["total_transit_ms"]
 
     # ------------------------------------------------------------------ #
     # Step 3 — Assemble packet

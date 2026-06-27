@@ -142,8 +142,18 @@ def test_packet_hop_log_latency_sums_to_total():
         "payload": "TEST",
     })
     data = r.json()
-    hop_sum = sum(h["total_hop_latency_ms"] for h in data["hop_log"])
-    assert abs(hop_sum - data["total_latency_ms"]) < 0.01
+    breakdown_sum = 0.0
+    for h in data["hop_log"]:
+        b = h["latency_breakdown"]
+        breakdown_sum += (
+            b["fiber_exit_ms"]
+            + b["atmosphere_exit_ms"]
+            + b["void_ms"]
+            + b["atmosphere_entry_ms"]
+            + b["tower_ms"]
+            + b["fiber_entry_ms"]
+        )
+    assert abs(breakdown_sum - data["total_latency_ms"]) < 0.01
 
 
 # ---------------------------------------------------------------------------

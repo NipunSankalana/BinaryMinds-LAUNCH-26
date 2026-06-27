@@ -112,12 +112,9 @@ def calculate_latency(req: LatencyRequest) -> LatencyResponse:
         tower_ms = transit_src["tower_delay_ms"] + transit_dst["tower_delay_ms"]
 
         hop_latency_ms = (
-            fiber_exit_ms
-            + atmosphere_exit_ms
+            atmosphere_exit_ms
             + void_ms
             + atmosphere_entry_ms
-            + tower_ms
-            + fiber_entry_ms
         )
 
         breakdown = LatencyBreakdown(
@@ -140,6 +137,17 @@ def calculate_latency(req: LatencyRequest) -> LatencyResponse:
                 total_hop_latency_ms=round(hop_latency_ms, 6),
             )
         )
+
+    # Calculate Grand Total Latency dynamically: Sum(Tp_nodes) + Sum(T_void_hops)
+    total_latency_ms = 0.0
+    for hop in hops:
+        total_latency_ms += hop.breakdown.atmosphere_exit_ms + hop.breakdown.void_ms + hop.breakdown.atmosphere_entry_ms
+    for node_id in route:
+        node = node_map[node_id]
+        transit = calculate_crust_transit_time(
+            node, entry_tower_map[node_id], exit_tower_map[node_id], ff, c, td
+        )
+        total_latency_ms += transit["total_transit_ms"]
 
     return LatencyResponse(
         route=route,

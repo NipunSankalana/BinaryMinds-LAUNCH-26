@@ -144,8 +144,11 @@ def calculate_crust_transit_time(
     """
     N = node.active_towers
     r = node.radius_km
-    s = min(abs(entry_tower - exit_tower), N - abs(entry_tower - exit_tower))
-    m = 1 if s == 0 else s + 1
+    s = min(abs(exit_tower - entry_tower), N - abs(exit_tower - entry_tower))
+    if entry_tower == exit_tower:
+        m = 1
+    else:
+        m = s + 1
     segment_distance = (2.0 * math.pi * r * s) / N
     fiber_speed = fiber_speed_fraction * speed_of_light
     fiber_time_ms = (segment_distance / fiber_speed) * 1000.0
