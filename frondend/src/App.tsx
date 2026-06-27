@@ -4,10 +4,11 @@ import { ControlPanel } from './components/ControlPanel';
 import { LogConsole } from './components/LogConsole';
 import { LatencyMetrics } from './components/LatencyMetrics';
 import {
-  findShortestPath,
+  findClosestTowerPair,
   encodeToBaseX
 } from './utils/math';
 import type { UniverseConfig, RouteResult } from './utils/math';
+import { api } from './utils/api';
 import { Activity, Cpu } from 'lucide-react';
 
 interface LogMessage {
@@ -15,70 +16,8 @@ interface LogMessage {
   type: 'info' | 'success' | 'error' | 'warning' | 'purple' | 'plain';
 }
 
-const DEFAULT_UNIVERSE: UniverseConfig = {
-  universe_metadata: {
-    speed_of_light_kms: 300000.0,
-    tower_processing_delay_ms: 7.0,
-    max_void_hop_distance_km: 1100000.0, // Forced multi-hop for Aegis -> Dawn -> Caelum
-    coordinate_scale_unit_km: 100000.0,
-    fiber_speed_fraction: 0.67
-  },
-  nodes: [
-    {
-      id: "Aegis",
-      codex: 8,
-      x: 0.0,
-      y: 10.0,
-      radius_km: 6000.0,
-      active_towers: 8,
-      atmosphere_thickness_km: 200.0,
-      refraction_index: 1.2
-    },
-    {
-      id: "Dawn",
-      codex: 5,
-      x: 8.0,
-      y: 4.0,
-      radius_km: 5000.0,
-      active_towers: 6,
-      atmosphere_thickness_km: 150.0,
-      refraction_index: 1.1
-    },
-    {
-      id: "Boreas",
-      codex: 10,
-      x: -6.0,
-      y: 4.0,
-      radius_km: 5500.0,
-      active_towers: 6,
-      atmosphere_thickness_km: 180.0,
-      refraction_index: 1.15
-    },
-    {
-      id: "Elysium",
-      codex: 12,
-      x: -3.0,
-      y: -2.0,
-      radius_km: 6200.0,
-      active_towers: 8,
-      atmosphere_thickness_km: 220.0,
-      refraction_index: 1.25
-    },
-    {
-      id: "Caelum",
-      codex: 14,
-      x: 8.0,
-      y: -2.0,
-      radius_km: 5800.0,
-      active_towers: 8,
-      atmosphere_thickness_km: 190.0,
-      refraction_index: 1.18
-    }
-  ]
-};
-
 function App() {
-  const [config, setConfig] = useState<UniverseConfig | null>(DEFAULT_UNIVERSE);
+  const [config, setConfig] = useState<UniverseConfig | null>(null);
   const [selectedOrigin, setSelectedOrigin] = useState<string | null>('Aegis');
   const [selectedDest, setSelectedDest] = useState<string | null>('Caelum');
   const [startTower, setStartTower] = useState<number>(0);
@@ -96,28 +35,69 @@ function App() {
   // Auto-calculate route on configuration, endpoints or chaos changes
   useEffect(() => {
     if (config && selectedOrigin && selectedDest) {
-      const route = findShortestPath(
-        config,
-        selectedOrigin,
-        selectedDest,
-        killedNodes,
-        killedLinks,
-        startTower,
-        endTower
-      );
-      setActiveRoute(route);
+      api.calculateLatency({
+        origin_id: selectedOrigin,
+        destination_id: selectedDest,
+        killed_nodes: Array.from(killedNodes),
+        killed_edges: Array.from(killedLinks).map(k => k.split('-') as [string, string])
+      }).then(res => {
+        const frontendHopLogs = res.hops.map((hop, idx) => {
+          const fromNode = config.nodes.find(n => n.id === hop.from_node)!;
+          const toNode = config.nodes.find(n => n.id === hop.to_node)!;
+          const { towerA, towerB } = findClosestTowerPair(fromNode, toNode, config.universe_metadata.coordinate_scale_unit_km || 100000);
+          return {
+            hop: idx + 1,
+            from_planet: hop.from_node,
+            to_planet: hop.to_node,
+            exit_tower: towerA,
+            entry_tower: towerB,
+            void_distance_km: hop.void_distance_km,
+            void_latency_ms: hop.breakdown.void_ms + hop.breakdown.atmosphere_exit_ms + hop.breakdown.atmosphere_entry_ms,
+            internal_transit_distance_km: fromNode.radius_km,
+            internal_transit_latency_ms: hop.breakdown.fiber_exit_ms + hop.breakdown.fiber_entry_ms,
+            tower_delay_ms: hop.breakdown.tower_ms,
+            hop_total_latency_ms: hop.total_hop_latency_ms,
+            payload_sent_codex: "",
+            payload_received_ascii: "",
+          };
+        });
+
+        setActiveRoute({
+          path: res.route,
+          total_latency_ms: res.total_latency_ms,
+          hop_logs: frontendHopLogs
+        });
+      }).catch(err => {
+        setActiveRoute({
+          path: [],
+          total_latency_ms: 0,
+          hop_logs: [],
+          error: err.message
+        });
+      });
     } else {
       setActiveRoute(null);
     }
-  }, [config, selectedOrigin, selectedDest, startTower, endTower, killedNodes, killedLinks]);
+  }, [config, selectedOrigin, selectedDest, killedNodes, killedLinks]);
 
-  // Initial welcome logs on startup
+  // Load universe config on startup
   useEffect(() => {
     setLogs([
       { text: "=== RELIC RING CORE PROTOCOL CONSOLE ===", type: "info" },
-      { text: "System initialized. Default Zeta-26 configuration loaded.", type: "success" },
-      { text: "Ready to route laser packets across star system legacy grid.", type: "plain" }
+      { text: "Connecting to tactical star grid backend...", type: "plain" }
     ]);
+    api.initializeUniverse()
+      .then(res => {
+        setConfig({
+          universe_metadata: res.metadata,
+          nodes: res.nodes
+        });
+        addLog("System initialized. Core Zeta-26 configuration loaded from backend.", "success");
+        addLog("Ready to route laser packets across star system legacy grid.", "plain");
+      })
+      .catch(err => {
+        addLog(`❌ FAILED TO INITIALIZE UNIVERSE: ${err.message}`, "error");
+      });
   }, []);
 
   const addLog = (text: string, type: LogMessage['type'] = 'plain') => {
@@ -129,30 +109,51 @@ function App() {
       alert("Cannot disable the selected origin or destination node during simulation setup.");
       return;
     }
-    const newKilled = new Set(killedNodes);
-    if (newKilled.has(id)) {
-      newKilled.delete(id);
-      addLog(`[CHAOS ENG] Planet ${id} online. Hardware links restored.`, 'info');
+    const isCurrentlyKilled = killedNodes.has(id);
+    
+    if (isCurrentlyKilled) {
+      // Unkill requires resetting simulation and re-killing all other nodes
+      api.resetSimulation().then(() => {
+        const otherNodesToKill = Array.from(killedNodes).filter(nid => nid !== id);
+        const promises = otherNodesToKill.map(nid => api.killNode(nid));
+        return Promise.all(promises);
+      }).then(() => {
+        const newKilled = new Set(killedNodes);
+        newKilled.delete(id);
+        setKilledNodes(newKilled);
+        addLog(`[CHAOS ENG] Planet ${id} online. Hardware links restored.`, 'info');
+      }).catch(err => {
+        addLog(`[CHAOS ENG] Error restoring node: ${err.message}`, 'error');
+      });
     } else {
-      newKilled.add(id);
-      addLog(`[CHAOS ENG] ALERT: Planet ${id} is offline (KILLED). Links severed.`, 'error');
+      // Kill node
+      api.killNode(id).then(() => {
+        const newKilled = new Set(killedNodes);
+        newKilled.add(id);
+        setKilledNodes(newKilled);
+        addLog(`[CHAOS ENG] ALERT: Planet ${id} is offline (KILLED). Links severed.`, 'error');
+      }).catch(err => {
+        addLog(`[CHAOS ENG] Error killing node: ${err.message}`, 'error');
+      });
     }
-    setKilledNodes(newKilled);
   };
 
   const handleLoadDefaultUniverse = () => {
-    setConfig(DEFAULT_UNIVERSE);
-    setKilledNodes(new Set());
-    setKilledLinks(new Set());
-    setSelectedOrigin('Aegis');
-    setSelectedDest('Caelum');
-    setStartTower(0);
-    setEndTower(0);
-    setPayloadText('Hello world');
-    setLogs([
-      { text: "=== RELIC RING CORE PROTOCOL CONSOLE ===", type: "info" },
-      { text: "Zeta-26 Core configuration reloaded.", type: "success" }
-    ]);
+    api.resetSimulation().then(() => {
+      setKilledNodes(new Set());
+      setKilledLinks(new Set());
+      setSelectedOrigin('Aegis');
+      setSelectedDest('Caelum');
+      setStartTower(0);
+      setEndTower(0);
+      setPayloadText('Hello world');
+      setLogs([
+        { text: "=== RELIC RING CORE PROTOCOL CONSOLE ===", type: "info" },
+        { text: "Zeta-26 Core configuration reloaded and reset.", type: "success" }
+      ]);
+    }).catch(err => {
+      addLog(`Error resetting simulation: ${err.message}`, 'error');
+    });
   };
 
   const handleRunSimulation = () => {
@@ -168,71 +169,86 @@ function App() {
       { text: `Payload: "${payloadText}"`, type: 'plain' }
     ]);
 
-    const path = activeRoute.path;
-    const hopLogs = activeRoute.hop_logs;
-    let hopIdx = 0;
-    
-    setPacketProgress({ currentHopIndex: 0, progress: 0 });
-
-    const animateHop = () => {
-      if (hopIdx >= path.length - 1) {
-        // Simulation Completed successfully
-        const destNode = config.nodes.find(n => n.id === selectedDest)!;
-        const encodedArray = encodeToBaseX(payloadText, destNode.codex);
-        
-        addLog(`\n[HOP ${hopIdx + 1}] Destination reached: ${selectedDest} (Base ${destNode.codex})`, 'success');
-        addLog(`[DEC] Received payload in Base ${destNode.codex}: [${encodedArray.join(', ')}]`, 'purple');
-        addLog(`[DEC] Decoded successfully to ASCII: "${payloadText}"`, 'success');
-        addLog(`\n[SUCCESS] Packet safely delivered. Total latency: ${activeRoute.total_latency_ms.toFixed(3)} ms.`, 'success');
-        setIsSimulating(false);
-        setPacketProgress(null);
-        return;
-      }
-
-      const currentPlanetId = path[hopIdx];
-      const nextPlanetId = path[hopIdx + 1];
-      const currentPlanet = config.nodes.find(n => n.id === currentPlanetId)!;
-      const nextPlanet = config.nodes.find(n => n.id === nextPlanetId)!;
-      const hopInfo = hopLogs[hopIdx];
-
-      addLog(`\n[HOP ${hopIdx + 1}] Origin: ${currentPlanetId} (Base ${currentPlanet.codex}) → Destination: ${nextPlanetId} (Base ${nextPlanet.codex})`, 'plain');
-      
-      // Step 1: Codex Dialect Conversion
-      const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
-      addLog(`[ENC] Translating payload to next hop dialect (Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
-      addLog(`[TX] Serialized payload to binary laser stream. Beaming from Tower ${hopInfo.exit_tower} to Tower ${hopInfo.entry_tower}.`, 'info');
-
-      // Step 2: Animate progress
-      let p = 0;
-      const duration = 1800; // ms
-      const intervalTime = 30; // ms
-      const steps = duration / intervalTime;
-      const delta = 1 / steps;
-
-      const progressInterval = setInterval(() => {
-        p += delta;
-        if (p >= 1) {
-          clearInterval(progressInterval);
-          setPacketProgress({ currentHopIndex: hopIdx, progress: 1 });
-          
-          // Hop finished
-          addLog(`[RX] Signal received at ${nextPlanetId} Tower ${hopInfo.entry_tower}.`, 'success');
-          addLog(`[DEC] Decoded Base ${nextPlanet.codex} back to ASCII: "${payloadText}"`, 'success');
-          addLog(`[LATENCY] Hop void transmission: ${hopInfo.void_latency_ms.toFixed(2)}ms. Internal transit + processing: ${(hopInfo.internal_transit_latency_ms + hopInfo.tower_delay_ms).toFixed(2)}ms.`, 'warning');
-
-          // Next hop
-          hopIdx++;
-          if (hopIdx < path.length - 1) {
-            setPacketProgress({ currentHopIndex: hopIdx, progress: 0 });
-          }
-          setTimeout(animateHop, 400);
-        } else {
-          setPacketProgress({ currentHopIndex: hopIdx, progress: p });
+    api.sendPacket(selectedOrigin, selectedDest, payloadText)
+      .then(packet => {
+        if (packet.status === 'failed') {
+          addLog(`[SIM ERROR] ${packet.error || 'Delivery failed'}`, 'error');
+          setIsSimulating(false);
+          return;
         }
-      }, intervalTime);
-    };
 
-    setTimeout(animateHop, 300);
+        const path = packet.route;
+        const hopLogs = packet.hop_log;
+        let hopIdx = 0;
+        
+        setPacketProgress({ currentHopIndex: 0, progress: 0 });
+
+        const animateHop = () => {
+          if (hopIdx >= path.length - 1) {
+            // Simulation Completed successfully
+            const destNode = config.nodes.find(n => n.id === selectedDest)!;
+            const encodedArray = encodeToBaseX(payloadText, destNode.codex);
+            
+            addLog(`\n[HOP ${hopIdx + 1}] Destination reached: ${selectedDest} (Base ${destNode.codex})`, 'success');
+            addLog(`[DEC] Received payload in Base ${destNode.codex}: [${encodedArray.join(', ')}]`, 'purple');
+            addLog(`[DEC] Decoded successfully to ASCII: "${payloadText}"`, 'success');
+            addLog(`\n[SUCCESS] Packet safely delivered. Total latency: ${packet.total_latency_ms.toFixed(3)} ms.`, 'success');
+            setIsSimulating(false);
+            setPacketProgress(null);
+            return;
+          }
+
+          const currentPlanetId = path[hopIdx];
+          const nextPlanetId = path[hopIdx + 1];
+          const currentPlanet = config.nodes.find(n => n.id === currentPlanetId)!;
+          const nextPlanet = config.nodes.find(n => n.id === nextPlanetId)!;
+          const hopInfo = hopLogs[hopIdx];
+          
+          const { towerA, towerB } = findClosestTowerPair(currentPlanet, nextPlanet, config.universe_metadata.coordinate_scale_unit_km || 100000);
+
+          addLog(`\n[HOP ${hopIdx + 1}] Origin: ${currentPlanetId} (Base ${currentPlanet.codex}) → Destination: ${nextPlanetId} (Base ${nextPlanet.codex})`, 'plain');
+          
+          // Step 1: Codex Dialect Conversion
+          const encodedPayload = encodeToBaseX(payloadText, nextPlanet.codex);
+          addLog(`[ENC] Translating payload to next hop dialect (Base ${nextPlanet.codex}): [${encodedPayload.join(', ')}]`, 'purple');
+          addLog(`[TX] Serialized payload to binary laser stream. Beaming from Tower ${towerA} to Tower ${towerB}.`, 'info');
+
+          // Step 2: Animate progress
+          let p = 0;
+          const duration = 1800; // ms
+          const intervalTime = 30; // ms
+          const steps = duration / intervalTime;
+          const delta = 1 / steps;
+
+          const progressInterval = setInterval(() => {
+            p += delta;
+            if (p >= 1) {
+              clearInterval(progressInterval);
+              setPacketProgress({ currentHopIndex: hopIdx, progress: 1 });
+              
+              // Hop finished
+              addLog(`[RX] Signal received at ${nextPlanetId} Tower ${towerB}.`, 'success');
+              addLog(`[DEC] Decoded Base ${nextPlanet.codex} back to ASCII: "${payloadText}"`, 'success');
+              addLog(`[LATENCY] Hop void transmission: ${hopInfo.latency_breakdown.void_ms.toFixed(2)}ms. Internal transit + processing: ${(hopInfo.latency_breakdown.fiber_exit_ms + hopInfo.latency_breakdown.fiber_entry_ms + hopInfo.latency_breakdown.tower_ms).toFixed(2)}ms.`, 'warning');
+
+              // Next hop
+              hopIdx++;
+              if (hopIdx < path.length - 1) {
+                setPacketProgress({ currentHopIndex: hopIdx, progress: 0 });
+              }
+              setTimeout(animateHop, 400);
+            } else {
+              setPacketProgress({ currentHopIndex: hopIdx, progress: p });
+            }
+          }, intervalTime);
+        };
+
+        setTimeout(animateHop, 300);
+      })
+      .catch(err => {
+        addLog(`[SIM ERROR] ${err.message}`, 'error');
+        setIsSimulating(false);
+      });
   };
 
   return (
