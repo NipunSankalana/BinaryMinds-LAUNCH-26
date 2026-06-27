@@ -3,6 +3,9 @@
 Interplanetary packet routing engine for universe **Zeta-26**.  
 Reads `universe-config.json` dynamically, computes latency, translates codex payloads, and serves REST API endpoints to the frontend.
 
+> ⚠️ **Shell**: All commands below are written for **Git Bash on Windows**.  
+> Do **not** use PowerShell or CMD — the activation path is different there.
+
 ---
 
 ## 📁 Project Structure
@@ -11,93 +14,80 @@ Reads `universe-config.json` dynamically, computes latency, translates codex pay
 backend/
 ├── main.py                  # FastAPI app entry point
 ├── requirements.txt         # Python dependencies
-├── universe-config.json     # Universe definition (loaded at runtime, NOT hardcoded)
+├── conftest.py              # pytest config (auto-finds universe-config.json)
+├── sample_response.json     # Sample API output for frontend reference
 │
-├── routers/
-│   ├── routing.py           # Route-finding endpoints
-│   ├── latency.py           # Latency breakdown endpoints
-│   └── simulation.py        # Packet send / kill node / reroute endpoints
+├── models/
+│   ├── universe.py          # UniverseMetadata, NodeModel, UniverseConfig
+│   ├── packet.py            # Packet, HopEntry, LatencyBreakdown
+│   └── edge.py              # EdgeModel (computed dynamically)
 │
 ├── services/
-│   ├── parser.py            # Loads and validates universe-config.json
-│   ├── dijkstra.py          # Graph construction + shortest-latency pathfinding (NetworkX)
-│   ├── latency.py           # Latency component calculations
+│   ├── parser.py            # Loads & validates universe-config.json
+│   ├── dijkstra.py          # Graph construction + Dijkstra pathfinding (NetworkX)
+│   ├── latency.py           # Physics latency calculations
 │   ├── translator.py        # Codex base conversion (ASCII ↔ planet codex)
-│   └── packet.py            # Packet lifecycle management
+│   └── packet.py            # Packet lifecycle / delivery simulation
 │
-└── models/
-    ├── universe.py          # Universe & metadata Pydantic models
-    ├── node.py              # Planet node model
-    ├── edge.py              # Link/edge model
-    └── packet.py            # Packet schema (origin_id, destination_id, current_id, payload, hop_log)
+├── routers/
+│   ├── universe.py          # GET  /api/universe/init
+│   ├── routing.py           # POST /api/route/find
+│   ├── latency.py           # POST /api/latency/calculate
+│   └── simulation.py        # POST /api/simulation/send|kill|reset  GET /state
+│
+└── tests/
+    ├── test_parser.py
+    ├── test_dijkstra.py
+    ├── test_latency.py
+    ├── test_translator.py
+    └── test_api.py
 ```
 
 ---
 
-## ⚙️ Environment Setup
+## ⚙️ Environment Setup (Git Bash on Windows)
 
 ### Prerequisites
 
-| Tool | Version |
-|------|---------|
-| Python | **3.12** (recommended) |
-| pip | latest |
+| Tool | Version | Check |
+|------|---------|-------|
+| Python | **3.12** | `py -3.12 --version` |
+| Git Bash | any | comes with Git for Windows |
 
 ---
 
-### 🐍 Setting Up with Python 3.12 (Recommended)
-
-If Python 3.12 is installed on your machine, use the following steps to create an isolated virtual environment.
-
-#### Windows (PowerShell)
-
-```powershell
-# 1. Navigate to the backend directory
-cd BinaryMinds-LAUNCH-26\backend
-
-# 2. Create a virtual environment using Python 3.12 explicitly
-py -3.12 -m venv venv
-
-# 3. Activate the virtual environment
-.\venv\Scripts\Activate.ps1
-
-# If you get a script execution policy error, run this first:
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# 4. Confirm Python version
-python --version   # Should print: Python 3.12.x
-
-# 5. Install dependencies
-pip install -r requirements.txt
-```
-
-#### macOS / Linux (Bash)
+### 🐍 Create & Activate Virtual Environment
 
 ```bash
-# 1. Navigate to the backend directory
-cd BinaryMinds-LAUNCH-26/backend
+# 1. Navigate into the backend directory
+cd backend
 
-# 2. Create a virtual environment using Python 3.12 explicitly
-python3.12 -m venv venv
+# 2. Create the virtual environment using Python 3.12
+py -3.12 -m venv venv
 
-# 3. Activate the virtual environment
-source venv/bin/activate
+# 3. Activate it — Git Bash uses the Scripts/activate script (NOT the .ps1 file)
+source venv/Scripts/activate
 
-# 4. Confirm Python version
-python --version   # Should print: Python 3.12.x
+# 4. Confirm Python version inside the env
+python --version
+# Expected: Python 3.12.x
 
-# 5. Install dependencies
+# 5. Install all dependencies
 pip install -r requirements.txt
 ```
+
+> **Why `venv/Scripts/activate` and not `venv/bin/activate`?**  
+> On Windows, Python creates `Scripts/` instead of `bin/` even inside Git Bash.  
+> The `source` prefix is what Git Bash needs to activate it correctly.
 
 ---
 
 ### ▶️ Running the Backend
 
-Make sure your virtual environment is **activated** before running.
+Make sure the virtual environment is **active** (you should see `(venv)` in your prompt).
 
 ```bash
-# Start the FastAPI dev server (hot reload enabled)
+# Start the FastAPI dev server with hot reload
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -111,6 +101,20 @@ The API will be available at:
 
 ---
 
+### 🧪 Running Tests
+
+```bash
+# Make sure venv is active first
+source venv/Scripts/activate
+
+# Run all tests with verbose output
+python -m pytest tests/ -v
+```
+
+Expected result: **64 passed**
+
+---
+
 ### 🔴 Deactivating the Environment
 
 ```bash
@@ -119,15 +123,31 @@ deactivate
 
 ---
 
-## 🌐 API Endpoints (Planned)
+### 🔁 Full Setup from Scratch (copy-paste)
+
+```bash
+cd backend
+py -3.12 -m venv venv
+source venv/Scripts/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+---
+
+## 🌐 API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/universe/init` | Load and return the universe graph from config |
-| `POST` | `/route/find` | Find the lowest-latency route between two nodes |
-| `POST` | `/packet/send` | Simulate packet delivery with full hop log |
-| `POST` | `/simulation/kill` | Kill a node or link, trigger reroute |
-| `GET` | `/packet/log` | Return the current hop log and latency breakdown |
+| `GET`  | `/` | Health check — confirms server + universe loaded |
+| `GET`  | `/api/universe/init` | Full graph: metadata + nodes + edges |
+| `POST` | `/api/route/find` | Find lowest-latency route between two planets |
+| `POST` | `/api/latency/calculate` | Per-hop latency breakdown for a route |
+| `POST` | `/api/simulation/send` | Simulate full packet delivery (hop log + translations) |
+| `POST` | `/api/simulation/kill/node` | Mark a planet as dead → triggers rerouting |
+| `POST` | `/api/simulation/kill/link` | Mark a link as dead → triggers rerouting |
+| `POST` | `/api/simulation/reset` | Restore all nodes/links, clear packet log |
+| `GET`  | `/api/simulation/state` | Current killed nodes/links + last packet result |
 
 ---
 
@@ -138,12 +158,9 @@ fastapi
 uvicorn[standard]
 networkx
 pydantic
-```
-
-Install all at once:
-
-```bash
-pip install -r requirements.txt
+python-multipart
+pytest
+httpx
 ```
 
 ---
@@ -155,56 +172,49 @@ pip install -r requirements.txt
 - ❌ **Never mix** backend logic with UI logic.
 - ✅ Packet schema must always contain: `origin_id`, `destination_id`, `current_id`, `payload`, `hop_log`.
 - ✅ Latency must be broken down per component: **void**, **atmosphere**, **fiber/crust**, **tower delay**.
-- ✅ Any void hop exceeding `max_void_hop_distance_km` must be **rejected**.
+- ✅ Any void hop exceeding `max_void_hop_distance_km` must be **rejected** from the graph.
 - ✅ A killed node/link must trigger **automatic rerouting**.
 
 ---
 
 ## 🧮 Latency Components
 
-Each hop latency is computed from these independent functions:
+| Component | Formula |
+|-----------|---------|
+| Void | `(d_void / c) × 1000` ms |
+| Atmosphere | `(h / (c / n)) × 1000` ms — once per planet, each side |
+| Fiber/Crust | `(radius / (c × fiber_fraction)) × 1000` ms |
+| Tower | `tower_processing_delay_ms` — flat, once per planet visited |
 
-| Function | What it computes |
-|----------|-----------------|
-| `calculate_void()` | Void travel time: center-to-center minus radii and atmospheres, at speed of light |
-| `calculate_atmosphere()` | Atmosphere transit: thickness `h` at refracted light speed |
-| `calculate_fiber()` | Internal crust transit: at `fiber_speed_fraction × c` |
-| `calculate_tower()` | Tower processing delay: `tower_processing_delay_ms` per planet visited |
-
-> ⚠️ Apply **one** `T_tower` per planet visited, **one** `T_void` per void hop. Do not double-count.
+> Rule: **one `T_tower`** per planet visited · **one `T_void`** per void hop. No double-counting.
 
 ---
 
-## 🔤 Codex Translation
+## 🗺️ Config File Location
 
-At each hop, the payload is re-encoded into the **destination planet's codex** (numerical base) before transmission:
-
-```
-ASCII → source codex (base N) → binary stream → void hop → decode → destination codex (base M) → ASCII
-```
-
-Supported bases from config: `5`, `6`, `8`, `10`, `14`, `16`
-
----
-
-## 🗺️ Universe Config Location
-
-The config file must be placed at the **project root** (one level above `backend/`):
+`universe-config.json` must be at the **project root** (one level above `backend/`):
 
 ```
-BinaryMinds-LAUNCH-26/
+BinaryMinds/
 ├── backend/
-│   └── ...
-├── frontend/
-│   └── ...
+├── frondend/
 └── universe-config.json   ← here
 ```
 
-The parser loads it using a relative path. **Do not duplicate or hardcode** the config inside `backend/`.
+The parser finds it automatically. Do **not** copy it inside `backend/`.
+
+---
+
+## 🔍 Demo Routes (Verified)
+
+| Scenario | Route |
+|----------|-------|
+| Normal delivery | `Aegis → Dawn → Caelum` |
+| Chaos (Dawn killed) | `Aegis → Elysium → Caelum` |
 
 ---
 
 ## 👤 Member Ownership
 
-This backend is the primary responsibility of **Member 1** (algorithms, routing, latency, translation).  
-Integration wiring to the frontend is coordinated by **Member 3**.
+Backend owned by **Member 1**.  
+API integration with frontend coordinated by **Member 3**.
