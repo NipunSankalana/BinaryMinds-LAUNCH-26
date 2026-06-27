@@ -14,6 +14,8 @@ To start both the backend and frontend concurrently, run the startup script at t
 start.bat
 ```
 
+> **Note**: The startup script will automatically install missing dependencies (Python venv and npm packages) on its first run.
+
 This will automatically open two separate Command Prompt windows:
 1. **FastAPI Backend** — runs on `http://localhost:8000` (Swagger UI at `/docs`)
 2. **React/Vite Frontend** — runs on `http://localhost:5173`
