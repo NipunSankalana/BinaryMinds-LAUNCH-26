@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Terminal, Copy, ArrowRight } from 'lucide-react';
+import { Terminal } from 'lucide-react';
 
 interface LogMessage {
   text: string;

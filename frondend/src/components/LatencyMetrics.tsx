@@ -1,6 +1,6 @@
 import React from 'react';
-import { RouteResult } from '../utils/math';
-import { Clock, HelpCircle, HardDrive, ShieldAlert, BarChart } from 'lucide-react';
+import type { RouteResult } from '../utils/math';
+import { Clock, ShieldAlert, BarChart } from 'lucide-react';
 
 interface LatencyMetricsProps {
   activeRoute: RouteResult | null;
@@ -29,7 +29,6 @@ export const LatencyMetrics: React.FC<LatencyMetricsProps> = ({ activeRoute }) =
   let totalVoidMs = 0;
   let totalFiberMs = 0;
   let totalTowerMs = 0;
-  let totalAtmosphereMs = 0;
 
   activeRoute.hop_logs.forEach((hop) => {
     totalVoidMs += hop.void_latency_ms;

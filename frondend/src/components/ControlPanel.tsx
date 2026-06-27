@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
-import { UniverseConfig, Planet, DEFAULT_SPEED_OF_LIGHT, DEFAULT_TOWER_DELAY, DEFAULT_MAX_VOID_HOP, DEFAULT_SCALE_UNIT, DEFAULT_FIBER_SPEED_FRACTION } from '../utils/math';
-import { Upload, Play, RefreshCw, Layers, ShieldAlert, Cpu } from 'lucide-react';
+import { DEFAULT_SPEED_OF_LIGHT, DEFAULT_TOWER_DELAY, DEFAULT_MAX_VOID_HOP, DEFAULT_SCALE_UNIT, DEFAULT_FIBER_SPEED_FRACTION } from '../utils/math';
+import type { UniverseConfig } from '../utils/math';
+import { Upload, Play, RefreshCw, Layers, Cpu } from 'lucide-react';
 
 interface ControlPanelProps {
   config: UniverseConfig | null;
