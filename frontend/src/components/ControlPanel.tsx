@@ -220,7 +220,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             type="file"
             ref={fileInputRef}
             onChange={handleFileUpload}
-            className="hidden"
+            style={{ display: 'none' }}
             accept=".json"
           />
           <button
